@@ -135,6 +135,7 @@ bool MergeMapsKinematic::addSubmapCallback(
   submap_marker_transform_[num_submaps_] =
     tf2::Transform(tf2::Quaternion(0., 0., 0., 1.0),
       tf2::Vector3(0, 0, 0));  // no initial correction -- identity mat
+  prev_submap_marker_transform_ = submap_marker_transform_;
   submap_locations_[num_submaps_] =
     Eigen::Vector3d(transform.getOrigin().getX(),
       transform.getOrigin().getY(), 0.);
@@ -266,12 +267,13 @@ bool MergeMapsKinematic::mergeMapCallback(
     for (LocalizedRangeScansIt iter = it_LRV->begin();
       iter != it_LRV->end(); ++iter)
     {
-      tf2::Transform submap_correction = submap_marker_transform_[id];
+      tf2::Transform submap_correction = submap_marker_transform_[id] * prev_submap_marker_transform_[id].inverse();
       transformScan(iter, submap_correction);
       transformed_scans.push_back((*iter));
     }
   }
-
+  prev_submap_marker_transform_ = submap_marker_transform_;
+  
   // create the map
   nav_msgs::srv::GetMap::Response map;
   try {
