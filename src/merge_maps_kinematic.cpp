@@ -273,7 +273,7 @@ bool MergeMapsKinematic::mergeMapCallback(
     }
   }
   prev_submap_marker_transform_ = submap_marker_transform_;
-  
+
   // create the map
   nav_msgs::srv::GetMap::Response map;
   try {
@@ -351,6 +351,7 @@ void MergeMapsKinematic::processInteractiveFeedback(
 
     submap_marker_transform_[id] = submap_marker_transform_[id] *
       previous_submap_correction.inverse() * new_submap_location;
+    mergeMapCallback(nullptr, nullptr, nullptr);
   }
 
   if (feedback->event_type ==
