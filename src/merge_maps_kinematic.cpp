@@ -36,11 +36,11 @@ void MergeMapsKinematic::configure()
 {
   resolution_ = 0.05;
   resolution_ = this->declare_parameter("resolution", resolution_);
-
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local();
   sstS_.push_back(this->create_publisher<nav_msgs::msg::OccupancyGrid>(
-      "/map", rclcpp::QoS(1)));
+      "map", qos));
   sstmS_.push_back(this->create_publisher<nav_msgs::msg::MapMetaData>(
-      "/map_metadata", rclcpp::QoS(1)));
+      "map_metadata", qos));
 
   ssMap_ = this->create_service<slam_toolbox::srv::MergeMaps>("slam_toolbox/merge_submaps",
       std::bind(&MergeMapsKinematic::mergeMapCallback, this, std::placeholders::_1,
