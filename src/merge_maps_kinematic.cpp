@@ -351,8 +351,7 @@ void MergeMapsKinematic::processInteractiveFeedback(
     msg.header.stamp = this->now();
     tfB_->sendTransform(msg);
 
-    submap_marker_transform_[id] = submap_marker_transform_[id] *
-      previous_submap_correction.inverse() * new_submap_location;
+    submap_marker_transform_[id] = new_submap_location;
   }
 
   if (feedback->event_type ==
