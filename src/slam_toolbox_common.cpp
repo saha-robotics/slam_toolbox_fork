@@ -261,7 +261,7 @@ void SlamToolbox::publishTransformLoop(
         msg.transform = tf2::toMsg(map_to_odom_);
         msg.child_frame_id = odom_frame_;
         msg.header.frame_id = map_frame_;
-        msg.header.stamp = scan_timestamp + transform_timeout_;
+        msg.header.stamp = this->now() + transform_timeout_; // TODO default was: scan_timestamp + transform_timeout_; fixed: this->now() + transform_timeout_  https://answers.ros.org/question/393581/for-nav2-lidar-timestamp-on-the-message-is-earlier-than-all-the-data-in-the-transform-cache/
         tfB_->sendTransform(msg);
       }
     }
