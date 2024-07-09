@@ -23,6 +23,9 @@
 #include "slam_toolbox/slam_toolbox_common.hpp"
 #include "slam_toolbox/serialization.hpp"
 
+bool first_map_only_ = false;
+
+
 namespace slam_toolbox
 {
 
@@ -254,7 +257,9 @@ void SlamToolbox::publishTransformLoop(
   while (rclcpp::ok()) {
     {
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
+      auto current_time = this->now();
       rclcpp::Time scan_timestamp = scan_header.stamp;
+      // RCLCPP_INFO(get_logger(), "pasted_time_last_recieved_scan_data = %f", (current_time - scan_timestamp).seconds());
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;
@@ -290,7 +295,10 @@ void SlamToolbox::publishVisualizations()
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
-    updateMap();
+    if(!first_map_only_){
+      updateMap();
+      // first_map_only_ = true;
+    }
     if (!isPaused(VISUALIZING_GRAPH)) {
       boost::mutex::scoped_lock lock(smapper_mutex_);
       closure_assistant_->publishGraph();
@@ -392,14 +400,25 @@ LaserRangeFinder * SlamToolbox::getLaser(
 bool SlamToolbox::updateMap()
 /*****************************************************************************/
 {
+  auto node_now = this->now();
+
   if (sst_->get_subscription_count() == 0) {
     return true;
   }
   boost::mutex::scoped_lock lock(smapper_mutex_);
+  auto node_now_second = scan_header.stamp;
+  auto time_diff = (node_now - node_now_second).seconds();
+  RCLCPP_ERROR(get_logger(),"time_diffUPDATEMAP %f",time_diff);
+
   OccupancyGrid * occ_grid = smapper_->getOccupancyGrid(resolution_);
+
+  auto node_now_third = scan_header.stamp;
+  auto time_diff2 = (node_now - node_now_third).seconds();
+  RCLCPP_ERROR(get_logger(),"time_diffUPDATEMAPafterlock %f",time_diff2);
   if (!occ_grid) {
     return false;
   }
+
 
   vis_utils::toNavMap(occ_grid, map_.map);
 
@@ -511,6 +530,8 @@ bool SlamToolbox::shouldProcessScan(
     smapper_->getMapper()->getParamMinimumTravelDistance();
   static int scan_ctr = 0;
   scan_ctr++;
+  RCLCPP_WARN(get_logger(), "scan_ctr++ %d", scan_ctr);
+
 
   // we give it a pass on the first measurement to get the ball rolling
   if (first_measurement_) {

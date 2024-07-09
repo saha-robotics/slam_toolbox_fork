@@ -118,8 +118,16 @@ void LocalizationSlamToolbox::laserCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr scan)
 /*****************************************************************************/
 {
+
   // store scan header
   scan_header = scan->header;
+  
+  auto node_now = this->now();
+  auto scan_time = scan_header.stamp;
+  auto time_diff = (node_now - scan_time).seconds();
+
+  RCLCPP_WARN(get_logger(), "Time difference between node->now() and scan header: %f seconds", time_diff);
+  
   // no odom info
   Pose2 pose;
   if (!pose_helper_->getOdomPose(pose, scan->header.stamp)) {
@@ -172,6 +180,8 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
       return nullptr;
     }
 
+    auto node_now = this->now();
+
     // set our position to the requested pose and process
     range_scan->SetOdometricPose(*process_near_pose_);
     range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
@@ -181,20 +191,37 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
     // reset to localization mode
     update_reprocessing_transform = true;
     processor_type_ = PROCESS_LOCALIZATION;
+
+    auto node_now_second = scan_header.stamp;
+    auto time_diff = (node_now - node_now_second).seconds();
+
+    RCLCPP_ERROR(get_logger(),"time_diffFIRST %f",time_diff);
+
   } else if (processor_type_ == PROCESS_LOCALIZATION) {
+
+    auto node_now = this->now();
+
     processed = smapper_->getMapper()->ProcessLocalization(range_scan, &covariance);
     update_reprocessing_transform = false;
+    
+    auto node_now_second = scan_header.stamp;
+    auto time_diff = (node_now - node_now_second).seconds();
+
+    RCLCPP_ERROR(get_logger(),"time_diffSECOND %f",time_diff);
   } else {
     RCLCPP_FATAL(get_logger(), "LocalizationSlamToolbox: "
       "No valid processor type set! Exiting.");
     exit(-1);
   }
 
+
+
   // if successfully processed, create odom to map transformation
   if (!processed) {
     delete range_scan;
     range_scan = nullptr;
   } else {
+    RCLCPP_DEBUG(get_logger(),"COULDNT SUCCESFULLY PROCESSED ODOM TO MAP TRANSFORMATION");
     // compute our new transform
     setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
       scan->header.stamp, update_reprocessing_transform);

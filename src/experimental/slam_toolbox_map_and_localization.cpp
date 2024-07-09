@@ -33,6 +33,8 @@ MapAndLocalizationSlamToolbox::MapAndLocalizationSlamToolbox(rclcpp::NodeOptions
     "slam_toolbox/set_localization_mode",
     std::bind(&MapAndLocalizationSlamToolbox::setLocalizationModeCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+  this->declare_parameter("localization_on_configure", false);
 }
 
 /*****************************************************************************/
@@ -40,7 +42,7 @@ void MapAndLocalizationSlamToolbox::configure()
 /*****************************************************************************/
 {
   SlamToolbox::configure();
-  toggleMode(false);
+  toggleMode(this->get_parameter("localization_on_configure").as_bool());
 }
 
 /*****************************************************************************/

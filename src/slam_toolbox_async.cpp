@@ -35,8 +35,16 @@ void AsynchronousSlamToolbox::laserCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr scan)
 /*****************************************************************************/
 {
+  RCLCPP_WARN(get_logger(),"THE WORKING VERSION IS ASYNC_SLAM_TOOLBOX");
   // store scan header
   scan_header = scan->header;
+
+  auto node_now = this->now();
+  auto scan_time = scan_header.stamp;
+  auto time_diff = (node_now - scan_time).seconds();
+
+  RCLCPP_WARN(get_logger(), "Time difference between node->now() and scan header async_mode: %f seconds", time_diff);
+
   // no odom info
   Pose2 pose;
   if (!pose_helper_->getOdomPose(pose, scan->header.stamp)) {
