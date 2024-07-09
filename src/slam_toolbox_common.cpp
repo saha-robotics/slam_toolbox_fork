@@ -296,12 +296,12 @@ void SlamToolbox::publishVisualizations()
   double map_update_interval = 10;
   map_update_interval = this->declare_parameter("map_update_interval",
       map_update_interval);
-  use_map_update_once_ = this->declare_parameter("use_map_update_once",
-      use_map_update_once_);
+  use_map_update_once = this->declare_parameter("use_map_update_once",
+      use_map_update_once);
       
   rclcpp::Rate r(1.0 / map_update_interval);
   while (rclcpp::ok()) {
-    if(use_map_update_once_){
+    if(use_map_update_once){
       if(update_map_once_){
         updateMap();
         update_map_once_ = false;
