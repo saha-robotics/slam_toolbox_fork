@@ -287,10 +287,20 @@ void SlamToolbox::publishVisualizations()
   double map_update_interval = 10;
   map_update_interval = this->declare_parameter("map_update_interval",
       map_update_interval);
+  publish_map_once_ = this->declare_parameter("publish_map_once",
+      publish_map_once_);
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
-    updateMap();
+    if(publish_map_once_){
+      if(update_map_once_){
+        updateMap();
+        update_map_once_ = false;
+      }
+    }
+    else{
+      updateMap();
+    }
     if (!isPaused(VISUALIZING_GRAPH)) {
       boost::mutex::scoped_lock lock(smapper_mutex_);
       closure_assistant_->publishGraph();
