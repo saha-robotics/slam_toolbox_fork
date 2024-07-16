@@ -255,6 +255,12 @@ void SlamToolbox::publishTransformLoop(
     {
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
       rclcpp::Time scan_timestamp = scan_header.stamp;
+
+      auto current_time = this->now();
+      auto last_scan_time = scan_header.stamp;
+
+      // RCLCPP_INFO(get_logger(), "pasted_time_last_recieved_scan_data = %f", (current_time - last_scan_time).seconds()  );
+      // std::cout << "pasted_time_last_recieved_scan_data" << (current_time - last_scan_time).seconds()<< std::endl;
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;
@@ -292,6 +298,8 @@ void SlamToolbox::publishVisualizations()
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
+    auto before_update_map = this->now();
+
     if(publish_map_once_){
       if(update_map_once_){
         updateMap();
@@ -301,6 +309,10 @@ void SlamToolbox::publishVisualizations()
     else{
       updateMap();
     }
+    auto after_update_map = this->now();
+    auto time_diff = (after_update_map - before_update_map).seconds();    
+    // RCLCPP_ERROR(get_logger(),"Pasted time in updateMap function inside PublishVisualization  %f",time_diff);
+    // std::cout << "finished computation in updateMap " << time_diff<< std::endl;
     if (!isPaused(VISUALIZING_GRAPH)) {
       boost::mutex::scoped_lock lock(smapper_mutex_);
       closure_assistant_->publishGraph();
