@@ -1961,6 +1961,11 @@ public:
   virtual ~Mapper();
 
 public:
+
+  double * m_pbestResponse;
+  double * GetBestResponse();
+  void  SetBestResponse(double * pBestResponse);
+
   /**
    * Allocate memory needed for mapping
    * @param rangeThreshold

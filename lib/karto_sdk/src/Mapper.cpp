@@ -719,7 +719,7 @@ void ScanMatcher::operator()(const kt_double & y) const
  * @param doPenalize whether to penalize matches further from the search center
  * @param rMean output parameter of mean (best pose) of match
  * @param rCovariance output parameter of covariance of match
- * @param do-ingFineMatch whether to do a finer search after coarse search
+ * @param doingFineMatch whether to do a finer search after coarse search
  * @return strength of response
  */
 kt_double ScanMatcher::CorrelateScan(
@@ -1539,8 +1539,19 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 
     std::cout << "Coarse response: " << coarseResponse << std::endl;
     std::cout << "Coarse var: " << covariance(0, 0) << ", " << covariance(1, 1) << std::endl;
-
+    
     m_pMapper->FireLoopClosureCheck(stream.str());
+
+    double coarsedResponse = coarseResponse;
+    try
+    {
+      std::cout << "---------------- OKKAYYYY-----------"<< std::endl;
+      m_pMapper->SetBestResponse(&coarsedResponse);
+      std::cout << "---------------- OKKAYYYY-----------"<< std::endl;
+    }
+    catch (std::exception & e) {
+      std::cout << "Exception caught: " << e.what() << std::endl;
+    }
 
     if ((coarseResponse > m_pMapper->m_pLoopMatchMinimumResponseCoarse->GetValue()) &&
       (covariance(0, 0) < m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue()) &&
@@ -1555,6 +1566,21 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
       kt_double fineResponse = m_pMapper->m_pSequentialScanMatcher->MatchScan(&tmpScan,
           candidateChain,
           bestPose, covariance, false);
+
+      std::cout << "--------------fineResponseeeeeeeeeeeee----------" << fineResponse << std::endl;
+
+      double finedResponse = fineResponse; 
+      std::cout << "--------------finedResponse----------" << finedResponse << std::endl;
+
+      try
+      {
+        std::cout << "---------------- OKKAYYYY-----------"<< std::endl;
+        m_pMapper->SetBestResponse(&finedResponse);
+        std::cout << "---------------- OKKAYYYY-----------"<< std::endl;
+      }
+      catch (std::exception & e) {
+        std::cout << "Exception caught: " << e.what() << std::endl;
+      }
 
       std::stringstream stream1;
       stream1 << "FINE RESPONSE: " << fineResponse << " (>" <<
@@ -3331,6 +3357,16 @@ void Mapper::FireEndLoopClosure(const std::string & rInfo) const
       pListener->EndLoopClosure(rInfo);
     }
   }
+}
+
+double * Mapper::GetBestResponse()
+{
+  return m_pbestResponse;
+}
+
+void  Mapper::SetBestResponse(double * pBestResponse)
+{
+  m_pbestResponse = pBestResponse;
 }
 
 void Mapper::SetScanSolver(ScanSolver * pScanOptimizer)
