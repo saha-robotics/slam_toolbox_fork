@@ -255,6 +255,18 @@ void SlamToolbox::publishTransformLoop(
     {
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
       rclcpp::Time scan_timestamp = scan_header.stamp;
+
+      //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
+      double * best_response =smapper_->getMapper()->GetBestResponse();
+      if (best_response != nullptr && *best_response > 0.02) {
+          try {
+          //TODO: Write publisher topic for localization health check.
+          } catch (std::exception & e) {
+          //TODO: Write publisher topic when cannot acces the result of health check .
+          }
+      } 
+      //      
+
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;
