@@ -2055,7 +2055,8 @@ Mapper::Mapper()
   m_pSequentialScanMatcher(NULL),
   m_pMapperSensorManager(NULL),
   m_pGraph(NULL),
-  m_pScanOptimizer(NULL)
+  m_pScanOptimizer(NULL),
+  m_pbestResponse(new double(0.0))
 {
   InitializeParameters();
 }
@@ -2070,7 +2071,8 @@ Mapper::Mapper(const std::string & rName)
   m_pSequentialScanMatcher(NULL),
   m_pMapperSensorManager(NULL),
   m_pGraph(NULL),
-  m_pScanOptimizer(NULL)
+  m_pScanOptimizer(NULL),
+  m_pbestResponse(new double(0.0))
 {
   InitializeParameters();
 }
@@ -2663,6 +2665,10 @@ void Mapper::Reset()
   if (m_pMapperSensorManager) {
     delete m_pMapperSensorManager;
     m_pMapperSensorManager = NULL;
+  }
+  if (m_pbestResponse) {
+    delete m_pbestResponse;
+    m_pbestResponse = NULL;
   }
   m_Initialized = false;
   m_Deserialized = false;
