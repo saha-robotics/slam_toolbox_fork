@@ -536,6 +536,12 @@ kt_double ScanMatcher::MatchScan(
   LocalizedRangeScan * pScan, const T & rBaseScans, Pose2 & rMean,
   Matrix3 & rCovariance, kt_bool doPenalize, kt_bool doRefineMatch)
 {
+#ifdef KARTO_DEBUG
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  start = std::chrono::system_clock::now(); 
+
+  std::cout << "\nDoing MatchScan\n" << std::endl;
+#endif 
   ///////////////////////////////////////
   // set scan pose to be center of grid
 
@@ -634,6 +640,14 @@ kt_double ScanMatcher::MatchScan(
     rCovariance(0, 0) << ", " << rCovariance(1, 1) << std::endl;
 #endif
   assert(math::InRange(rMean.GetHeading(), -KT_PI, KT_PI));
+
+#ifdef KARTO_DEBUG
+  end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::cout << "-------finished computation of MATCHSCAN at\n"
+            << "-------elapsed time: " << elapsed_seconds.count() << "s\n";  
+#endif
+
   /*
   * purpose of equal to best_response is; Instead of {double} type {kt_double} doesn't mean anything inside the slam_toolbox_common 
   */
@@ -1518,7 +1532,14 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 
   LocalizedRangeScanVector candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
 
+#ifdef KARTO_DEBUG
+  std::cout << "TryCloseLoop candidateChain size: " << candidateChain.size() << std::endl;
+#endif
+
   while (!candidateChain.empty()) {
+#ifdef KARTO_DEBUG
+    std::cout << "Checking of the candidatecChainsize inside of Loop CLosure: " << candidateChain.size() << std::endl;
+#endif
     Pose2 bestPose;
     Matrix3 covariance;
     kt_double coarseResponse = m_pLoopScanMatcher->MatchScan(pScan, candidateChain,
@@ -1566,7 +1587,9 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
         loopClosed = true;
       }
     }
-
+#ifdef KARTO_DEBUG
+  std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
+#endif
     candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
   }
 
@@ -1662,9 +1685,25 @@ void MapperGraph::LinkNearChains(
 
     Pose2 mean;
     Matrix3 covariance;
+#ifdef KARTO_DEBUG
+    using namespace std::chrono;
+
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    start = std::chrono::system_clock::now(); 
+#endif
+
     // match scan against "near" chain
     kt_double response = m_pMapper->m_pSequentialScanMatcher->MatchScan(pScan, *iter, mean,
         covariance, false);
+
+#ifdef KARTO_DEBUG
+    end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    std::cout << "----------Calculating time of Matchscan after triggered\n"
+              << "----------LinkNearCHains function\n" 
+              << "----------elapsed time: " << elapsed_seconds.count() << "s\n";    
+#endif
+
     if (response > m_pMapper->m_pLinkMatchMinimumResponseFine->GetValue() - KT_TOLERANCE) {
       rMeans.push_back(mean);
       rCovariances.push_back(covariance);
@@ -1986,6 +2025,13 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
 
   kt_int32u nScans =
     static_cast<kt_int32u>(m_pMapper->m_pMapperSensorManager->GetScans(rSensorName).size());
+
+#ifdef KARTO_DEBUG
+  std::cout << "\nnScans size " << nScans << std::endl;
+  
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  start = std::chrono::system_clock::now(); 
+#endif
   for (; rStartNum < nScans; rStartNum++) {
     LocalizedRangeScan * pCandidateScan = m_pMapper->m_pMapperSensorManager->GetScan(rSensorName,
         rStartNum);
@@ -2018,7 +2064,13 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
       }
     }
   }
-
+#ifdef KARTO_DEBUG
+  end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start; 
+  std::cout <<"----------Finded chain size is" << chain.size() << std::endl;
+  std::cout <<"----------Calculating time of Matchscan inside nscans function\n" 
+            <<"----------elapsed time: " << elapsed_seconds.count() << "s\n";
+#endif
   return chain;
 }
 
@@ -2730,10 +2782,21 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     // correct scan (if not first scan)
     if (m_pUseScanMatching->GetValue() && pLastScan != NULL) {
       Pose2 bestPose;
+#ifdef KARTO_DEBUG
+      std::chrono::time_point<std::chrono::system_clock> start, end;
+      start = std::chrono::system_clock::now();
+#endif
       m_pSequentialScanMatcher->MatchScan(pScan,
         m_pMapperSensorManager->GetRunningScans(pScan->GetSensorName()),
         bestPose,
         cov);
+#ifdef KARTO_DEBUG
+      end = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsed_seconds = end - start;
+      std::cout <<"----------Calculating time of Matchscan after triggered\n"
+                <<"----------HasMovedEnough function\n" 
+                <<"----------elapsed time: " << elapsed_seconds.count() << "s\n";        
+#endif
       pScan->SetSensorPose(bestPose);
       if (covariance) {
         *covariance = cov;
@@ -2801,10 +2864,22 @@ kt_bool Mapper::ProcessAgainstNodesNearBy(LocalizedRangeScan * pScan, kt_bool ad
     // correct scan (if not first scan)
     if (m_pUseScanMatching->GetValue() && pLastScan != NULL) {
       Pose2 bestPose;
+#ifdef KARTO_DEBUG
+      std::chrono::time_point<std::chrono::system_clock> start, end;
+      start = std::chrono::system_clock::now();     
+#endif
       m_pSequentialScanMatcher->MatchScan(pScan,
         m_pMapperSensorManager->GetRunningScans(pScan->GetSensorName()),
         bestPose,
         cov);
+#ifdef KARTO_DEBUG
+      end = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsed_seconds = end - start;
+
+      std::cout << "----------Calculating time of Matchscan after triggered\n"
+                << "----------ProcessAgainstNodesNearBy function\n" 
+                << "----------elapsed time: " << elapsed_seconds.count() << "s\n";     
+#endif
       pScan->SetSensorPose(bestPose);
     }
 
@@ -2891,10 +2966,22 @@ kt_bool Mapper::ProcessLocalization(LocalizedRangeScan * pScan, Matrix3 * covari
   // correct scan (if not first scan)
   if (m_pUseScanMatching->GetValue() && pLastScan != NULL) {
     Pose2 bestPose;
+#ifdef KARTO_DEBUG
+      std::chrono::time_point<std::chrono::system_clock> start, end;
+      start = std::chrono::system_clock::now();     
+#endif
     m_pSequentialScanMatcher->MatchScan(pScan,
       m_pMapperSensorManager->GetRunningScans(pScan->GetSensorName()),
       bestPose,
       cov);
+#ifdef KARTO_DEBUG
+      end = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsed_seconds = end - start;
+
+      std::cout << "----------Calculating time of Matchscan after triggered\n"
+                << "----------ProcessLocalization function\n" 
+                << "----------elapsed time: " << elapsed_seconds.count() << "s\n";     
+#endif
     pScan->SetSensorPose(bestPose);
     if (covariance) {
       *covariance = cov;
@@ -3074,10 +3161,22 @@ kt_bool Mapper::ProcessAgainstNode(
     // correct scan (if not first scan)
     if (m_pUseScanMatching->GetValue() && pLastScan != NULL) {
       Pose2 bestPose;
+#ifdef KARTO_DEBUG
+      std::chrono::time_point<std::chrono::system_clock> start, end;
+      start = std::chrono::system_clock::now();     
+#endif
       m_pSequentialScanMatcher->MatchScan(pScan,
         m_pMapperSensorManager->GetRunningScans(pScan->GetSensorName()),
         bestPose,
         cov);
+#ifdef KARTO_DEBUG
+      end = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsed_seconds = end - start;
+
+      std::cout << "----------Calculating time of Matchscan after triggered\n"
+                << "----------ProcessAgainstNode function\n" 
+                << "----------elapsed time: " << elapsed_seconds.count() << "s\n";     
+#endif
       pScan->SetSensorPose(bestPose);
     }
 
