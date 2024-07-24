@@ -3239,6 +3239,18 @@ void Mapper::FireEndLoopClosure(const std::string & rInfo) const
   }
 }
 
+double* Mapper::GetBestResponse()
+{
+  return m_pbestResponse; 
+}
+
+void Mapper::SetBestResponse(double* pBestResponse)
+{
+  if (pBestResponse != nullptr) {
+    *m_pbestResponse = *pBestResponse; 
+  }
+}
+
 void Mapper::SetScanSolver(ScanSolver * pScanOptimizer)
 {
   m_pScanOptimizer = pScanOptimizer;
