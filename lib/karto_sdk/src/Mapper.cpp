@@ -634,6 +634,19 @@ kt_double ScanMatcher::MatchScan(
     rCovariance(0, 0) << ", " << rCovariance(1, 1) << std::endl;
 #endif
   assert(math::InRange(rMean.GetHeading(), -KT_PI, KT_PI));
+  /*
+  * purpose of equal to best_response is; Instead of {double} type {kt_double} doesn't mean anything inside the slam_toolbox_common 
+  */
+  double best_response = bestResponse; 
+
+  try
+  {
+    m_pMapper->SetBestResponse(&best_response);  
+  }
+  catch (std::exception & e) {
+    throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "
+            "unable to publish set best response!");
+  }
 
   return bestResponse;
 }
