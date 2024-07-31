@@ -209,7 +209,7 @@ void SlamToolbox::setROSInterfaces()
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
   localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-    "localization_health_baha", 10);
+    "slam_toolbox/best_response", 10);
 
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
