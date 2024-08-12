@@ -208,6 +208,9 @@ void SlamToolbox::setROSInterfaces()
 
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
+  localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+    "slam_toolbox/best_response", 10);
+
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
   sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
@@ -255,6 +258,27 @@ void SlamToolbox::publishTransformLoop(
     {
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
       rclcpp::Time scan_timestamp = scan_header.stamp;
+
+      //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
+      double * best_response =smapper_->getMapper()->GetBestResponse();
+      static double previous_best_response = 0.0;  
+
+      if (best_response != nullptr && *best_response > 0.02) {
+          try {
+            if (*best_response != previous_best_response) {
+                std_msgs::msg::Float32 msg;
+                msg.data = static_cast<float>(*best_response);  // TODO: Change here
+                localization_health_pub_->publish(msg);
+                previous_best_response = *best_response;  
+            }
+          } 
+          catch (std::exception & e) {
+          //TODO: Write publisher topic when cannot acces the result of health check .
+            RCLCPP_ERROR(this->get_logger(), "Exception caught while dereferencing best_response: %s", e.what());
+          }
+      } 
+      //      
+
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;

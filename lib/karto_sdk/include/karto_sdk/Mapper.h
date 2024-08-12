@@ -1961,6 +1961,14 @@ public:
   virtual ~Mapper();
 
 public:
+
+  /** 
+   * Purpose of this function is set the best response to localization health information
+   */
+  double * m_pbestResponse;
+  double * GetBestResponse();
+  void  SetBestResponse(double * pBestResponse);
+
   /**
    * Allocate memory needed for mapping
    * @param rangeThreshold
