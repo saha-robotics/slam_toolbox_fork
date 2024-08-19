@@ -67,7 +67,7 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
   if (enable_localization) {
     RCLCPP_INFO(get_logger(), "Enabling localization ...");
     processor_type_ = PROCESS_LOCALIZATION;
-
+    publish_map_once_ = this->get_parameter("publish_map_once").as_bool();
     localization_pose_sub_ =
       create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
       "initialpose", 1, std::bind(&MapAndLocalizationSlamToolbox::localizePoseCallback, this, std::placeholders::_1));
@@ -87,6 +87,7 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
     map_saver_ = std::make_unique<map_saver::MapSaver>(shared_from_this(), map_name_);
 
     boost::mutex::scoped_lock lock(smapper_mutex_);
+    publish_map_once_ = false;
     if (smapper_ && !smapper_->getMapper()->GetLocalizationVertices().empty()) {
       smapper_->clearLocalizationBuffer();
     }
