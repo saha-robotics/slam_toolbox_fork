@@ -49,7 +49,7 @@ void MergeMapsKinematic::configure()
       std::bind(&MergeMapsKinematic::addSubmapCallback, this, std::placeholders::_1,
       std::placeholders::_2, std::placeholders::_3));
 
-  tfB_ = std::make_unique<tf2_ros::TransformBroadcaster>(shared_from_this());
+  tfB_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(shared_from_this());
 
   interactive_server_ =
     std::make_unique<interactive_markers::InteractiveMarkerServer>(
