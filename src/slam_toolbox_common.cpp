@@ -208,9 +208,6 @@ void SlamToolbox::setROSInterfaces()
 
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
-  localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-    "slam_toolbox/best_response", 10);
-
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
   sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
@@ -231,6 +228,10 @@ void SlamToolbox::setROSInterfaces()
   ssDesserialize_ = this->create_service<slam_toolbox::srv::DeserializePoseGraph>(
     "slam_toolbox/deserialize_map",
     std::bind(&SlamToolbox::deserializePoseGraphCallback, this,
+    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+  ssReset_ = this->create_service<slam_toolbox::srv::Reset>(
+    "slam_toolbox/reset",
+    std::bind(&SlamToolbox::resetCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
   scan_filter_sub_ =
@@ -258,27 +259,6 @@ void SlamToolbox::publishTransformLoop(
     {
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
       rclcpp::Time scan_timestamp = scan_header.stamp;
-
-      //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
-      double * best_response =smapper_->getMapper()->GetBestResponse();
-      static double previous_best_response = 0.0;  
-
-      if (best_response != nullptr && *best_response > 0.02) {
-          try {
-            if (*best_response != previous_best_response) {
-                std_msgs::msg::Float32 msg;
-                msg.data = static_cast<float>(*best_response);  // TODO: Change here
-                localization_health_pub_->publish(msg);
-                previous_best_response = *best_response;  
-            }
-          } 
-          catch (std::exception & e) {
-          //TODO: Write publisher topic when cannot acces the result of health check .
-            RCLCPP_ERROR(this->get_logger(), "Exception caught while dereferencing best_response: %s", e.what());
-          }
-      } 
-      //      
-
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;
@@ -311,20 +291,10 @@ void SlamToolbox::publishVisualizations()
   double map_update_interval = 10;
   map_update_interval = this->declare_parameter("map_update_interval",
       map_update_interval);
-  publish_map_once_ = this->declare_parameter("publish_map_once",
-      publish_map_once_);
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
-    if(publish_map_once_){
-      if(update_map_once_){
-        updateMap();
-        update_map_once_ = false;
-      }
-    }
-    else{
-      updateMap();
-    }
+    updateMap();
     if (!isPaused(VISUALIZING_GRAPH)) {
       boost::mutex::scoped_lock lock(smapper_mutex_);
       closure_assistant_->publishGraph();
@@ -871,6 +841,33 @@ bool SlamToolbox::deserializePoseGraphCallback(
         "Deserialization called without valid processor type set.");
   }
 
+  return true;
+}
+
+/*****************************************************************************/
+bool SlamToolbox::resetCallback(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std::shared_ptr<slam_toolbox::srv::Reset::Request> req,
+  std::shared_ptr<slam_toolbox::srv::Reset::Response> resp)
+/*****************************************************************************/
+{
+  boost::mutex::scoped_lock lock(smapper_mutex_);
+  // Reset the map.
+  smapper_->Reset();
+  smapper_->getMapper()->getScanSolver()->Reset();
+
+  // Ensure we will process the next available scan.
+  first_measurement_ = true;
+
+  // Pause new measurements processing if requested.
+  if (req->pause_new_measurements) {
+    state_.set(NEW_MEASUREMENTS, true);
+    this->set_parameter({"paused_new_measurements", true});
+    RCLCPP_INFO(get_logger(),
+      "SlamToolbox: Toggled to pause taking new measurements after reset.");
+  }
+  
+  resp->result = resp->RESULT_SUCCESS;
   return true;
 }
 
