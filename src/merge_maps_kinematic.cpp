@@ -118,8 +118,6 @@ bool MergeMapsKinematic::addSubmapCallback(
     og.info.width * og.info.resolution / 2.0,
     og.info.origin.position.y + og.info.height * og.info.resolution / 2.0,
     0.));
-  og.info.origin.position.x = -(og.info.width * og.info.resolution / 2.0);
-  og.info.origin.position.y = -(og.info.height * og.info.resolution / 2.0);
   og.header.stamp = this->now();
   og.header.frame_id = "map_" + std::to_string(num_submaps_);
   sstS_[num_submaps_]->publish(og);
