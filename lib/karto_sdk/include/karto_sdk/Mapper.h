@@ -1968,7 +1968,14 @@ public:
   double * m_pbestResponse;
   double * GetBestResponse();
   void  SetBestResponse(double * pBestResponse);
-
+  
+  /**
+   * After service called if bestResponse calculated, it will publish the service
+   */
+  mutable bool m_bestResponseServiceFlag; //For acces const member function
+  bool GetBestResponseServiceFlag();
+  void SetBestResponseServiceFlag(bool checkBestResponse);
+  
   /**
    * Allocate memory needed for mapping
    * @param rangeThreshold
