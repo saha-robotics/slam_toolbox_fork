@@ -859,6 +859,7 @@ bool SlamToolbox::resetCallback(
   // Ensure we will process the next available scan.
   first_measurement_ = true;
 
+  reprocessing_transform_ = tf2::Transform::getIdentity();
   // Pause new measurements processing if requested.
   if (req->pause_new_measurements) {
     state_.set(NEW_MEASUREMENTS, true);
