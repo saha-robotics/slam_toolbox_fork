@@ -832,7 +832,7 @@ bool SlamToolbox::getBestResponseCallback(
     if (best_response != nullptr) {
         res->message = std::to_string(*best_response);  
         res->success = true;
-        return true;  /
+        return true; 
     } else {
         res->message = "Couldn't find bestResponse";
         res->success = false;
