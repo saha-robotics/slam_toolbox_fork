@@ -196,6 +196,8 @@ void SlamToolbox::setROSInterfaces()
 /*****************************************************************************/
 {
   double tmp_val = 30.;
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+
   tmp_val = this->declare_parameter("tf_buffer_duration", tmp_val);
   tf_ = std::make_unique<tf2_ros::Buffer>(this->get_clock(),
       tf2::durationFromSec(tmp_val));
@@ -209,7 +211,7 @@ void SlamToolbox::setROSInterfaces()
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
   localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-    "slam_toolbox/best_response", 10);
+    "slam_toolbox/best_response", qos);
 
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
@@ -232,6 +234,11 @@ void SlamToolbox::setROSInterfaces()
     "slam_toolbox/deserialize_map",
     std::bind(&SlamToolbox::deserializePoseGraphCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+  ssGetBestResponse_ = this->create_service<std_srvs::srv::Trigger>(
+    "slam_toolbox/get_best_response",
+    std::bind(&SlamToolbox::getBestResponseCallback, this,
+    std::placeholders::_1,std::placeholders::_2));
 
   scan_filter_sub_ =
     std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(
@@ -810,6 +817,27 @@ void SlamToolbox::loadSerializedPoseGraph(
   }
 
   solver_->Compute();
+}
+
+/*****************************************************************************/
+bool SlamToolbox::getBestResponseCallback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> res) 
+/*****************************************************************************/
+{
+    smapper_->getMapper()->SetBestResponseServiceFlag(true);
+
+    double * best_response = smapper_->getMapper()->GetBestResponse();
+
+    if (best_response != nullptr) {
+        res->message = std::to_string(*best_response);  
+        res->success = true;
+        return true;  /
+    } else {
+        res->message = "Couldn't find bestResponse";
+        res->success = false;
+        return false;  
+    }
 }
 
 /*****************************************************************************/
