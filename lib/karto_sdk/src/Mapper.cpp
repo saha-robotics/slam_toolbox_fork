@@ -1546,7 +1546,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
     try
     {
       m_pMapper->SetBestResponse(&best_response); 
-      m_pMapper->SetBestResponseServiceFlag(false);
     }
     catch (std::exception & e) {
       throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "
@@ -2150,8 +2149,7 @@ Mapper::Mapper()
   m_pMapperSensorManager(NULL),
   m_pGraph(NULL),
   m_pScanOptimizer(NULL),
-  m_pbestResponse(new double(0.0)),
-  m_bestResponseServiceFlag(false)
+  m_pbestResponse(new double(0.0))
 {
   InitializeParameters();
 }
@@ -2167,8 +2165,7 @@ Mapper::Mapper(const std::string & rName)
   m_pMapperSensorManager(NULL),
   m_pGraph(NULL),
   m_pScanOptimizer(NULL),
-  m_pbestResponse(new double(0.0)),
-  m_bestResponseServiceFlag(false)
+  m_pbestResponse(new double(0.0))
 {
   InitializeParameters();
 }
@@ -2766,7 +2763,6 @@ void Mapper::Reset()
     delete m_pbestResponse;
     m_pbestResponse = NULL;
   }
-  m_bestResponseServiceFlag = false;
   m_Initialized = false;
   m_Deserialized = false;
   while (!m_LocalizationScanVertices.empty()) {
@@ -3264,11 +3260,6 @@ kt_bool Mapper::HasMovedEnough(LocalizedRangeScan * pScan, LocalizedRangeScan * 
     return true;
   }
 
-  if (m_bestResponseServiceFlag) {
-    m_bestResponseServiceFlag = false;  // Reset the flag
-    return true;
-  }
-
   // test if enough time has passed
   kt_double timeInterval = pScan->GetTime() - pLastScan->GetTime();
   if (timeInterval >= m_pMinimumTimeInterval->GetValue()) {
@@ -3386,17 +3377,6 @@ void Mapper::FireEndLoopClosure(const std::string & rInfo) const
       pListener->EndLoopClosure(rInfo);
     }
   }
-}
-
-void Mapper::SetBestResponseServiceFlag(bool checkBestResponse)
-{
-  std::cout<<"Setting Best Response Service Flag to true"<<std::endl;
-  m_bestResponseServiceFlag = checkBestResponse;
-}
-
-bool Mapper::GetBestResponseServiceFlag()
-{
-  return m_bestResponseServiceFlag;
 }
 
 double* Mapper::GetBestResponse()
