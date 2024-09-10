@@ -84,12 +84,11 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
   }
   else {
     RCLCPP_INFO(get_logger(), "Enabling mapping ...");
-    changeMapTopic(std::string("map"));
     processor_type_ = PROCESS;
     localization_pose_sub_.reset();
     clear_localization_.reset();
     map_saver_ = std::make_unique<map_saver::MapSaver>(shared_from_this(), map_name_);
-
+    changeMapTopic(std::string("map"));
     boost::mutex::scoped_lock lock(smapper_mutex_);
     publish_map_once_ = false;
     if (smapper_ && !smapper_->getMapper()->GetLocalizationVertices().empty()) {
@@ -106,8 +105,8 @@ void MapAndLocalizationSlamToolbox::loadPoseGraphByParams()
     LocalizationSlamToolbox::loadPoseGraphByParams();
   }
   else {
-    changeMapTopic(map_name_);
     SlamToolbox::loadPoseGraphByParams();
+    changeMapTopic(map_name_);
   }
 }
 
@@ -187,6 +186,7 @@ LocalizedRangeScan * MapAndLocalizationSlamToolbox::addScan(
 void MapAndLocalizationSlamToolbox::changeMapTopic(const std::string & map_topic)
 /*****************************************************************************/
 {
+    boost::mutex::scoped_lock lock(smapper_mutex_);
     sst_.reset();
     sstm_.reset();
     sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
