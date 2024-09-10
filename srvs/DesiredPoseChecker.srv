@@ -1,0 +1,15 @@
+float64 pose_x
+float64 pose_y
+bool do_relocalize 
+int32 process_timeout
+float64 search_range
+float64 minimum_best_response 
+float64 angle_resolution
+
+---
+float64 best_response
+float64 relocated_x
+float64 relocated_y
+float64 relocated_yaw
+string message
+bool success
