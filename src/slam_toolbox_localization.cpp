@@ -39,6 +39,12 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::bind(&LocalizationSlamToolbox::clearLocalizationBuffer, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  ssGetBestResponse_ = this->create_service<slam_toolbox::srv::DesiredPoseChecker>(
+      "slam_toolbox/get_best_response",
+      std::bind(&LocalizationSlamToolbox::getBestResponseCallback, this,
+      std::placeholders::_1, std::placeholders::_2));
+
+
   // in localization mode, we cannot allow for interactive mode
   enable_interactive_mode_ = false;
 
@@ -122,6 +128,7 @@ void LocalizationSlamToolbox::laserCallback(
   scan_header = scan->header;
   // no odom info
   Pose2 pose;
+  RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Processing scans.");
   if (!pose_helper_->getOdomPose(pose, scan->header.stamp)) {
     RCLCPP_WARN(get_logger(), "Failed to compute odom pose");
     return;
@@ -148,10 +155,19 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   Pose2 & odom_pose)
 /*****************************************************************************/
 {
+  // dirty storage:
+  last_laser_stored_ = laser;
+  last_scan_stored_ = scan;
+  last_odom_pose_stored_ = odom_pose;
+  have_scan_values_ = true;
+
   boost::mutex::scoped_lock l(pose_mutex_);
 
   if (processor_type_ == PROCESS_LOCALIZATION && process_near_pose_) {
     processor_type_ = PROCESS_NEAR_REGION;
+  }
+  if (processor_type_ == PROCESS_LOCALIZATION && process_desired_pose_) {
+    processor_type_ = PROCESS_DESIRED_POSE;
   }
 
   LocalizedRangeScan * range_scan = getLocalizedRangeScan(
@@ -172,7 +188,7 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
       return nullptr;
     }
 
-    // set our position to the requested pose and process
+    // set our position to the requested pose and proces
     range_scan->SetOdometricPose(*process_near_pose_);
     range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
     process_near_pose_.reset(nullptr);
@@ -181,20 +197,25 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
     // reset to localization mode
     update_reprocessing_transform = true;
     processor_type_ = PROCESS_LOCALIZATION;
-  } else if (processor_type_ == PROCESS_LOCALIZATION) {
+  }else if (processor_type_ == PROCESS_DESIRED_POSE) {
+    // process_desired_pose_.reset(nullptr);
+    update_reprocessing_transform = false;
+    processor_type_ = PROCESS_LOCALIZATION;
+  }else if (processor_type_ == PROCESS_LOCALIZATION) {
     processed = smapper_->getMapper()->ProcessLocalization(range_scan, &covariance);
     update_reprocessing_transform = false;
-  } else {
+  } 
+  else {
     RCLCPP_FATAL(get_logger(), "LocalizationSlamToolbox: "
       "No valid processor type set! Exiting.");
     exit(-1);
   }
-
   // if successfully processed, create odom to map transformation
   if (!processed) {
     delete range_scan;
     range_scan = nullptr;
-  } else {
+  } 
+  else {
     // compute our new transform
     setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
       scan->header.stamp, update_reprocessing_transform);
@@ -203,6 +224,133 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   }
 
   return range_scan;
+}
+
+/*****************************************************************************/
+bool LocalizationSlamToolbox::getBestResponseCallback(
+    const std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Request> req,
+    std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Response> res) 
+/*****************************************************************************/
+{
+  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+  std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+  Matrix3 covariance;
+  LocalizedRangeScan * range_scan = nullptr;
+  covariance.SetToIdentity();
+  {
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    smapper_->clearLocalizationBuffer();
+  }
+  double loop_search_maximum_distance;
+  double link_scan_maximum_distance;
+  double minimum_best_response;
+  double angle_resolution;
+  double search_maximum_distance;
+  double search_maximum_loop_closure_distance;
+  double search_maximum_link_scan_distance;
+  int process_timeout;
+  this->get_parameter("loop_search_maximum_distance", loop_search_maximum_distance);
+  this->get_parameter("link_scan_maximum_distance", link_scan_maximum_distance);
+
+  if (req->pose_x == 0.0 || req->pose_y == 0.0) {
+      RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided.");
+      res->message = "Error: pose_x or pose_y is missing. Please use it";
+      res->success = false;
+      return false;
+  }
+  if (req->minimum_best_response == 0.0) {
+    RCLCPP_INFO(get_logger(), "minimum_best_response is not provided setting initial value to 0.5");
+    minimum_best_response = (req->minimum_best_response != 0.0) ? req->minimum_best_response : 0.5;
+  }
+  if(req->angle_resolution == 0.0){
+    RCLCPP_INFO(get_logger(), "angle_resolution is not provided setting initial value to 20.0");
+    angle_resolution = (req->angle_resolution != 0.0) ? req->angle_resolution : 20.0;
+  }  
+  if(req->process_timeout == 0){
+    RCLCPP_INFO(get_logger(), "process_timeout is not provided setting initial value to 10");
+    process_timeout = (req->process_timeout != 0) ? req->process_timeout : 10;  
+  }
+  if(req->search_range == 0.0){
+    RCLCPP_INFO(get_logger(), "search_maximum_distance is not provided setting initial value to yaml param");
+    search_maximum_distance = req->search_range;
+    this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", search_maximum_distance));
+    this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", search_maximum_distance));
+  }
+
+  std::cout << "last_odom_pose_stored_ " << last_odom_pose_stored_ << std::endl;
+  if (!have_scan_values_) {
+    res->message = "No scan values stored try later";
+    res->success = false;
+    this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
+    this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
+    return false;
+  }
+  else{
+      for (double angle = 0.0; angle <= 360.0; angle += angle_resolution) {
+        bool processed = false;
+        {    
+          boost::mutex::scoped_lock l(pose_mutex_);
+          process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, angle);
+          range_scan = getLocalizedRangeScan(last_laser_stored_, last_scan_stored_, last_odom_pose_stored_);
+
+          boost::mutex::scoped_lock lock(smapper_mutex_);
+          range_scan->SetOdometricPose(*process_desired_pose_);
+          range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
+          processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
+        }
+        double * best_response = smapper_->getMapper()->GetBestResponse();
+
+        if (processed) {
+          std::cout << "best_response " << *best_response << std::endl;
+          std::cout << "req->minimum_best_response " << minimum_best_response << std::endl;
+          if (best_response != nullptr && *best_response > minimum_best_response) {
+              std::cout<< "finded best response" << std::endl;
+              res->message = std::to_string(*best_response);  
+              res->success = true;
+              this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
+              this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
+              if (req->do_relocalize) {
+                // compute our new transform
+                setTransformFromPoses(range_scan->GetCorrectedPose(), last_odom_pose_stored_,
+                  last_scan_stored_->header.stamp, true);
+
+                publishPose(range_scan->GetCorrectedPose(), covariance, last_scan_stored_->header.stamp);
+              }
+              return true; 
+          } else {
+              res->message = "Couldn't find bestResponse";
+              {
+                boost::mutex::scoped_lock lock(smapper_mutex_);
+                smapper_->clearLocalizationBuffer();
+              }
+          }
+        }
+        else {
+          res->message = "Couldn't process scan will try again";
+          end = std::chrono::high_resolution_clock::now();
+          auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+          if (time_elapsed > process_timeout) {
+              res->message = "Couldnt process scan in " + std::to_string(process_timeout) + " seconds";
+              res->success = false;
+              this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
+              this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
+
+              return false;
+          }
+        }
+
+        end = std::chrono::high_resolution_clock::now();
+        auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+        if (time_elapsed > process_timeout) {
+            res->message = "Couldnt find bestResponse in " + std::to_string(process_timeout) + " seconds";
+            res->success = false;
+              this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
+              this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
+            return false;
+        }
+      }
+      res->message = "Couldn't find with this resolution at desired time, halving the angle_resolution and decreasing best_response then search again.";
+    }
 }
 
 /*****************************************************************************/
