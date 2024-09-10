@@ -129,10 +129,6 @@ protected:
     const std::shared_ptr<slam_toolbox::srv::Pause::Request> req,
     std::shared_ptr<slam_toolbox::srv::Pause::Response> resp);
 
-  bool getBestResponseCallback(
-      const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
-      std::shared_ptr<std_srvs::srv::Trigger::Response> res
-    );
   // ROS-y-ness
   std::unique_ptr<tf2_ros::Buffer> tf_;
   std::unique_ptr<tf2_ros::TransformListener> tfL_;
@@ -147,7 +143,6 @@ protected:
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::Pause>> ssPauseMeasurements_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::SerializePoseGraph>> ssSerialize_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::DeserializePoseGraph>> ssDesserialize_;
-  std::shared_ptr<rclcpp::Service<std_srvs::srv::Trigger>> ssGetBestResponse_; // TODO: check here
 
   // Storage for ROS parameters
   std::string odom_frame_, map_frame_, base_frame_, map_name_, scan_topic_;
@@ -182,6 +177,7 @@ protected:
   nav_msgs::srv::GetMap::Response map_;
   ProcessType processor_type_;
   std::unique_ptr<karto::Pose2> process_near_pose_;
+  std::unique_ptr<karto::Pose2> process_desired_pose_;
   tf2::Transform reprocessing_transform_;
 
   // pluginlib

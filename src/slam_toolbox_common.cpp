@@ -235,11 +235,6 @@ void SlamToolbox::setROSInterfaces()
     std::bind(&SlamToolbox::deserializePoseGraphCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-  ssGetBestResponse_ = this->create_service<std_srvs::srv::Trigger>(
-    "slam_toolbox/get_best_response",
-    std::bind(&SlamToolbox::getBestResponseCallback, this,
-    std::placeholders::_1,std::placeholders::_2));
-
   scan_filter_sub_ =
     std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(
     shared_from_this().get(), scan_topic_, rmw_qos_profile_sensor_data);
@@ -817,27 +812,6 @@ void SlamToolbox::loadSerializedPoseGraph(
   }
 
   solver_->Compute();
-}
-
-/*****************************************************************************/
-bool SlamToolbox::getBestResponseCallback(
-    const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
-    std::shared_ptr<std_srvs::srv::Trigger::Response> res) 
-/*****************************************************************************/
-{
-    smapper_->getMapper()->SetBestResponseServiceFlag(true);
-
-    double * best_response = smapper_->getMapper()->GetBestResponse();
-
-    if (best_response != nullptr) {
-        res->message = std::to_string(*best_response);  
-        res->success = true;
-        return true; 
-    } else {
-        res->message = "Couldn't find bestResponse";
-        res->success = false;
-        return false;  
-    }
 }
 
 /*****************************************************************************/
