@@ -66,6 +66,8 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
 
   if (enable_localization) {
     RCLCPP_INFO(get_logger(), "Enabling localization ...");
+    changeMapTopic(map_name_);
+    updateMap();
     processor_type_ = PROCESS_LOCALIZATION;
     publish_map_once_ = this->get_parameter("publish_map_once").as_bool();
     localization_pose_sub_ =
@@ -78,9 +80,11 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
 
     // in localization mode, disable map saver
     map_saver_.reset();
+    
   }
   else {
     RCLCPP_INFO(get_logger(), "Enabling mapping ...");
+    changeMapTopic("map");
     processor_type_ = PROCESS;
     localization_pose_sub_.reset();
     clear_localization_.reset();
@@ -102,6 +106,7 @@ void MapAndLocalizationSlamToolbox::loadPoseGraphByParams()
     LocalizationSlamToolbox::loadPoseGraphByParams();
   }
   else {
+    changeMapTopic(map_name_);
     SlamToolbox::loadPoseGraphByParams();
   }
 }
@@ -132,6 +137,7 @@ bool MapAndLocalizationSlamToolbox::deserializePoseGraphCallback(
     return LocalizationSlamToolbox::deserializePoseGraphCallback(request_header, req, resp);
   }
   else {
+    changeMapTopic(map_name_);
     return SlamToolbox::deserializePoseGraphCallback(request_header, req, resp);
   }
 }
@@ -177,6 +183,18 @@ LocalizedRangeScan * MapAndLocalizationSlamToolbox::addScan(
   }
 }
 
+/*****************************************************************************/
+void MapAndLocalizationSlamToolbox::changeMapTopic(const std::string & map_topic)
+/*****************************************************************************/
+{
+    sst_.reset();
+    sstm_.reset();
+    sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+      map_topic, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
+      map_topic + "_metadata",
+      rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+}
 }  // namespace slam_toolbox
 
 #include "rclcpp_components/register_node_macro.hpp"
