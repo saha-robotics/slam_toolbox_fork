@@ -84,7 +84,7 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
   }
   else {
     RCLCPP_INFO(get_logger(), "Enabling mapping ...");
-    changeMapTopic("map");
+    changeMapTopic(std::string("map"));
     processor_type_ = PROCESS;
     localization_pose_sub_.reset();
     clear_localization_.reset();
