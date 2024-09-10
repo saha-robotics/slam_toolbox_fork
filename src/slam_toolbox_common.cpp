@@ -189,6 +189,41 @@ void SlamToolbox::setParams()
   smapper_->configure(shared_from_this());
   this->declare_parameter("paused_new_measurements",rclcpp::ParameterType::PARAMETER_BOOL);
   this->set_parameter({"paused_new_measurements", false});
+
+  /*
+  * Those parameters for pose_search service
+  */
+  position_search_distance_ = 10.0;
+  position_search_distance_ = this->declare_parameter("position_search_distance",
+      position_search_distance_);
+  
+  position_search_resolution_ = 0.2;
+  position_search_resolution_ = this->declare_parameter("position_search_resolution",
+      position_search_resolution_);
+
+  position_search_smear_deviation_ = 0.2;
+  position_search_smear_deviation_ = this->declare_parameter("position_search_smear_deviation",
+      position_search_smear_deviation_);
+
+  position_search_fine_angle_offset_ = 0.0314;
+  position_search_fine_angle_offset_ = this->declare_parameter("position_search_fine_search_angle_offset",
+      position_search_fine_angle_offset_);
+
+  position_search_coarse_angle_offset_ = 3.14;
+  position_search_coarse_angle_offset_ = this->declare_parameter("position_search_coarse_angle_offset",
+      position_search_coarse_angle_offset_);
+
+  position_search_coarse_angle_resolution_ = 0.314;
+  position_search_coarse_angle_resolution_ = this->declare_parameter("position_search_coarse_angle_resolution",
+      position_search_coarse_angle_resolution_);
+
+  position_search_do_relocalization_ = false;
+  position_search_do_relocalization_ = this->declare_parameter("position_search_do_relocalization",
+      position_search_do_relocalization_);
+
+  position_search_minimum_best_response_ = 0.45;
+  position_search_minimum_best_response_ = this->declare_parameter("position_search_minimum_best_response",
+      position_search_minimum_best_response_);
 }
 
 /*****************************************************************************/

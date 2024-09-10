@@ -241,16 +241,37 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
     boost::mutex::scoped_lock lock(smapper_mutex_);
     smapper_->clearLocalizationBuffer();
   }
-  double loop_search_maximum_distance;
-  double link_scan_maximum_distance;
-  double minimum_best_response;
-  double angle_resolution;
-  double search_maximum_distance;
-  double search_maximum_loop_closure_distance;
-  double search_maximum_link_scan_distance;
-  int process_timeout;
-  this->get_parameter("loop_search_maximum_distance", loop_search_maximum_distance);
-  this->get_parameter("link_scan_maximum_distance", link_scan_maximum_distance);
+
+  /*
+  Yaml parameters definitions for setting the parameters after process finished
+  */
+  double initial_correlation_search_space_dimension = this->get_parameter("correlation_search_space_dimension").as_double();
+  double initial_correlation_search_space_resolution = this->get_parameter("correlation_search_space_resolution").as_double();
+  double initial_correlation_search_space_smear_deviation = this->get_parameter("correlation_search_space_smear_deviation").as_double();
+
+  double initial_loop_search_space_dimension = this->get_parameter("loop_search_space_dimension").as_double(); 
+  // double initial_loop_search_space_resolution = this->get_parameter("loop_search_space_resolution").as_double();
+  // double initial_loop_search_space_smear_deviation = this->get_parameter("loop_search_space_smear_deviation").as_double();
+
+  double initial_fine_search_angle_offset = this->get_parameter("fine_search_angle_offset").as_double();
+  double initial_coarse_search_angle_offset = this->get_parameter("coarse_search_angle_offset").as_double();
+  double initial_coarse_angle_resolution = this->get_parameter("coarse_angle_resolution").as_double();
+
+  double initial_do_relocalization = this->get_parameter("position_search_do_relocalization").as_bool();
+  double initial_minimum_best_response = this->get_parameter("position_search_minimum_best_response").as_double();
+
+  /*
+  * Setting initial_definitions.
+  */
+
+  smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(position_search_distance_);
+  smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(position_search_resolution_);
+  smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(position_search_smear_deviation_);
+  smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance_);
+  smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset_);
+  smapper_->getMapper()->setParamCoarseSearchAngleOffset(position_search_coarse_angle_offset_);
+  smapper_->getMapper()->setParamCoarseAngleResolution(position_search_coarse_angle_resolution_);
+
 
   if (req->pose_x == 0.0 || req->pose_y == 0.0) {
       RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided.");
@@ -258,39 +279,36 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
       res->success = false;
       return false;
   }
-  if (req->minimum_best_response == 0.0) {
-    RCLCPP_INFO(get_logger(), "minimum_best_response is not provided setting initial value to 0.5");
-    minimum_best_response = (req->minimum_best_response != 0.0) ? req->minimum_best_response : 0.5;
+
+  if (req->do_relocalization){
+    RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Searching for best response with relocalize");
+    initial_do_relocalization = true;
+  } else {
+    RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Searching for best response without relocalize");
+    initial_do_relocalization = false;
   }
-  if(req->angle_resolution == 0.0){
-    RCLCPP_INFO(get_logger(), "angle_resolution is not provided setting initial value to 20.0");
-    angle_resolution = (req->angle_resolution != 0.0) ? req->angle_resolution : 20.0;
-  }  
-  if(req->process_timeout == 0){
-    RCLCPP_INFO(get_logger(), "process_timeout is not provided setting initial value to 10");
-    process_timeout = (req->process_timeout != 0) ? req->process_timeout : 10;  
-  }
-  if(req->search_range == 0.0){
-    RCLCPP_INFO(get_logger(), "search_maximum_distance is not provided setting initial value to yaml param");
-    search_maximum_distance = req->search_range;
-    this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", search_maximum_distance));
-    this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", search_maximum_distance));
+  
+  if (req->search_distance != 0.0) {
+    position_search_distance_ = req->search_distance;
+    this->set_parameter(rclcpp::Parameter("correlation_search_space_dimension", position_search_distance_));
+  } 
+
+  if (req->minimum_best_response != 0.0) {
+    initial_minimum_best_response = req->minimum_best_response;
+    this->set_parameter(rclcpp::Parameter("position_search_minimum_best_response", initial_minimum_best_response));
   }
 
-  std::cout << "last_odom_pose_stored_ " << last_odom_pose_stored_ << std::endl;
   if (!have_scan_values_) {
     res->message = "No scan values stored try later";
     res->success = false;
-    this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
-    this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
     return false;
   }
   else{
-      for (double angle = 0.0; angle <= 360.0; angle += angle_resolution) {
+      // for (double angle = 0.0; angle <= 360.0; angle += angle_resolution) {
         bool processed = false;
         {    
           boost::mutex::scoped_lock l(pose_mutex_);
-          process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, angle);
+          process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, 0.0);
           range_scan = getLocalizedRangeScan(last_laser_stored_, last_scan_stored_, last_odom_pose_stored_);
 
           boost::mutex::scoped_lock lock(smapper_mutex_);
@@ -298,58 +316,75 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
           range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
           processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
         }
-        double * best_response = smapper_->getMapper()->GetBestResponse();
 
         if (processed) {
+          double * best_response = smapper_->getMapper()->GetBestResponse();
           std::cout << "best_response " << *best_response << std::endl;
-          std::cout << "req->minimum_best_response " << minimum_best_response << std::endl;
-          if (best_response != nullptr && *best_response > minimum_best_response) {
+          std::cout << "req->minimum_best_response " << initial_minimum_best_response << std::endl;
+          if (best_response != nullptr && *best_response > initial_minimum_best_response) {
               std::cout<< "finded best response" << std::endl;
               res->message = std::to_string(*best_response);  
               res->success = true;
-              this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
-              this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
-              if (req->do_relocalize) {
-                // compute our new transform
+              if (initial_do_relocalization) {
+                
                 setTransformFromPoses(range_scan->GetCorrectedPose(), last_odom_pose_stored_,
                   last_scan_stored_->header.stamp, true);
 
                 publishPose(range_scan->GetCorrectedPose(), covariance, last_scan_stored_->header.stamp);
               }
+
+              smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
+              smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
+              smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
+              smapper_->getMapper()->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
+              smapper_->getMapper()->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
+              smapper_->getMapper()->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
+              smapper_->getMapper()->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
+              
+
               return true; 
           } else {
               res->message = "Couldn't find bestResponse";
+              res->success = false;
               {
                 boost::mutex::scoped_lock lock(smapper_mutex_);
                 smapper_->clearLocalizationBuffer();
               }
-          }
-        }
-        else {
-          res->message = "Couldn't process scan will try again";
-          end = std::chrono::high_resolution_clock::now();
-          auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
-          if (time_elapsed > process_timeout) {
-              res->message = "Couldnt process scan in " + std::to_string(process_timeout) + " seconds";
-              res->success = false;
-              this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
-              this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
-
+              smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
+              smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
+              smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
+              smapper_->getMapper()->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
+              smapper_->getMapper()->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
+              smapper_->getMapper()->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
+              smapper_->getMapper()->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
               return false;
           }
         }
+        // else {
+        //   res->message = "Couldn't process scan will try again";
+        //   end = std::chrono::high_resolution_clock::now();
+        //   auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+        //   if (time_elapsed > process_timeout) {
+        //       res->message = "Couldnt process scan in " + std::to_string(process_timeout) + " seconds";
+        //       res->success = false;
+        //       this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
 
-        end = std::chrono::high_resolution_clock::now();
-        auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
-        if (time_elapsed > process_timeout) {
-            res->message = "Couldnt find bestResponse in " + std::to_string(process_timeout) + " seconds";
-            res->success = false;
-              this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
-              this->set_parameter(rclcpp::Parameter("link_scan_maximum_distance", link_scan_maximum_distance));
-            return false;
-        }
-      }
+        //       return false;
+        //   }
+        // }
+
+        // end = std::chrono::high_resolution_clock::now();
+        // auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+        // if (time_elapsed > process_timeout) {
+        //     res->message = "Couldnt find bestResponse in " + std::to_string(process_timeout) + " seconds";
+        //     res->success = false;
+        //       this->set_parameter(rclcpp::Parameter("loop_search_maximum_distance", loop_search_maximum_distance));
+        //     return false;
+        // }
+      // }
       res->message = "Couldn't find with this resolution at desired time, halving the angle_resolution and decreasing best_response then search again.";
+      res->success = false;
+      return false;
     }
 }
 
