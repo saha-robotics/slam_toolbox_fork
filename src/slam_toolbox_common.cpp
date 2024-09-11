@@ -196,6 +196,8 @@ void SlamToolbox::setROSInterfaces()
 /*****************************************************************************/
 {
   double tmp_val = 30.;
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+
   tmp_val = this->declare_parameter("tf_buffer_duration", tmp_val);
   tf_ = std::make_unique<tf2_ros::Buffer>(this->get_clock(),
       tf2::durationFromSec(tmp_val));
@@ -209,7 +211,7 @@ void SlamToolbox::setROSInterfaces()
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
   localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-    "slam_toolbox/best_response", 10);
+    "slam_toolbox/best_response", qos);
 
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
