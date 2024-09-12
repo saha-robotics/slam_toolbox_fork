@@ -156,6 +156,16 @@ protected:
   double yaw_covariance_scale_;
   bool first_measurement_, enable_interactive_mode_;
 
+  // Position search service params
+  double position_search_distance_;
+  double position_search_resolution_;
+  double position_search_smear_deviation_;
+  double position_search_fine_angle_offset_;
+  double position_search_coarse_angle_offset_;
+  double position_search_coarse_angle_resolution_;
+  double position_search_minimum_best_response_;
+  bool position_search_do_relocalization_;
+
   // Book keeping
   std::unique_ptr<mapper_utils::SMapper> smapper_;
   std::unique_ptr<karto::Dataset> dataset_;
@@ -176,6 +186,7 @@ protected:
   nav_msgs::srv::GetMap::Response map_;
   ProcessType processor_type_;
   std::unique_ptr<karto::Pose2> process_near_pose_;
+  std::unique_ptr<karto::Pose2> process_desired_pose_;
   tf2::Transform reprocessing_transform_;
 
   // pluginlib
