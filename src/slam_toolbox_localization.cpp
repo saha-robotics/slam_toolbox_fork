@@ -41,7 +41,7 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
 
   ssGetBestResponse_ = this->create_service<slam_toolbox::srv::DesiredPoseChecker>(
       "slam_toolbox/get_best_response",
-      std::bind(&LocalizationSlamToolbox::getBestResponseCallback, this,
+      std::bind(&LocalizationSlamToolbox::desiredPoseCheck, this,
       std::placeholders::_1, std::placeholders::_2));
 
 
@@ -227,7 +227,7 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
 }
 
 /*****************************************************************************/
-bool LocalizationSlamToolbox::getBestResponseCallback(
+bool LocalizationSlamToolbox::desiredPoseCheck(
     const std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Request> req,
     std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Response> res) 
 /*****************************************************************************/
@@ -250,6 +250,7 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
   double initial_correlation_search_space_smear_deviation = this->get_parameter("correlation_search_space_smear_deviation").as_double();
 
   double initial_loop_search_space_dimension = this->get_parameter("loop_search_space_dimension").as_double(); 
+  double initial_loop_search_maximum_distance = this->get_parameter("loop_search_maximum_distance").as_double();
   // double initial_loop_search_space_resolution = this->get_parameter("loop_search_space_resolution").as_double();
   // double initial_loop_search_space_smear_deviation = this->get_parameter("loop_search_space_smear_deviation").as_double();
 
@@ -259,19 +260,30 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
 
   double initial_do_relocalization = this->get_parameter("position_search_do_relocalization").as_bool();
   double initial_minimum_best_response = this->get_parameter("position_search_minimum_best_response").as_double();
+  double initial_minimum_link_best_response = this->get_parameter("link_match_minimum_response_fine").as_double();
 
   /*
   * Setting initial_definitions.
   */
 
-  smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(position_search_distance_);
-  smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(position_search_resolution_);
-  smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(position_search_smear_deviation_);
-  smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance_);
-  smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset_);
-  smapper_->getMapper()->setParamCoarseSearchAngleOffset(position_search_coarse_angle_offset_);
-  smapper_->getMapper()->setParamCoarseAngleResolution(position_search_coarse_angle_resolution_);
+  {
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    smapper_->getMapper()->setParamLoopSearchSpaceDimension(2*position_search_distance_);
+    smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_distance_);
+    smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset_);
+    smapper_->getMapper()->setParamCoarseSearchAngleOffset(position_search_coarse_angle_offset_);
+    smapper_->getMapper()->setParamCoarseAngleResolution(position_search_coarse_angle_resolution_);
+    smapper_->getMapper()->setParamLinkMatchMinimumResponseFine(position_search_minimum_best_response_);
+    
+    if (req->search_distance != 0.0) {
+      position_search_distance_ = req->search_distance;
+      smapper_->getMapper()->setParamLoopSearchSpaceDimension(2*position_search_distance_);
+      smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_distance_);
+    } 
 
+    smapper_->getMapper()->m_Initialized = false;
+    std::cout << "m_Initialized: " << smapper_->getMapper()->m_Initialized << std::endl;
+  }
 
   if (req->pose_x == 0.0 || req->pose_y == 0.0) {
       RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided.");
@@ -288,10 +300,6 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
     initial_do_relocalization = false;
   }
   
-  if (req->search_distance != 0.0) {
-    position_search_distance_ = req->search_distance;
-    this->set_parameter(rclcpp::Parameter("correlation_search_space_dimension", position_search_distance_));
-  } 
 
   if (req->minimum_best_response != 0.0) {
     initial_minimum_best_response = req->minimum_best_response;
@@ -333,14 +341,15 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
                 publishPose(range_scan->GetCorrectedPose(), covariance, last_scan_stored_->header.stamp);
               }
 
-              smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
-              smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
-              smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
-              smapper_->getMapper()->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
-              smapper_->getMapper()->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
-              smapper_->getMapper()->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
-              smapper_->getMapper()->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
-              
+              // skartomapper_->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
+              // skartomapper_->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
+              // skartomapper_->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
+              // skartomapper_->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
+              // skartomapper_->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
+              // skartomapper_->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
+              // skartomapper_->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
+              // skartomapper_->setParamLinkMatchMinimumResponseFine(initial_minimum_link_best_response);
+              // smapper_->getMapper()->setParamLoopSearchMaximumDistance(initial_loop_search_maximum_distance);
 
               return true; 
           } else {
@@ -350,13 +359,16 @@ bool LocalizationSlamToolbox::getBestResponseCallback(
                 boost::mutex::scoped_lock lock(smapper_mutex_);
                 smapper_->clearLocalizationBuffer();
               }
-              smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
-              smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
-              smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
-              smapper_->getMapper()->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
-              smapper_->getMapper()->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
-              smapper_->getMapper()->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
-              smapper_->getMapper()->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
+              // skartomapper_->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
+              // skartomapper_->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
+              // skartomapper_->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
+              // skartomapper_->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
+              // skartomapper_->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
+              // skartomapper_->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
+              // skartomapper_->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
+              // skartomapper_->setParamLinkMatchMinimumResponseFine(initial_minimum_link_best_response);
+              // smapper_->getMapper()->setParamLoopSearchMaximumDistance(initial_loop_search_maximum_distance);
+
               return false;
           }
         }

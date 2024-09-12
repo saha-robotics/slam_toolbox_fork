@@ -43,7 +43,7 @@ protected:
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     std::shared_ptr<std_srvs::srv::Empty::Response> resp);
 
-  bool getBestResponseCallback(
+  bool desiredPoseCheck(
     const std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Request> req,
     std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Response> res); 
 
