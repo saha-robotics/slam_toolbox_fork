@@ -40,7 +40,7 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
   ssGetBestResponse_ = this->create_service<slam_toolbox::srv::DesiredPoseChecker>(
-      "slam_toolbox/get_best_response",
+      "slam_toolbox/desired_pose_check",
       std::bind(&LocalizationSlamToolbox::desiredPoseCheck, this,
       std::placeholders::_1, std::placeholders::_2));
 
