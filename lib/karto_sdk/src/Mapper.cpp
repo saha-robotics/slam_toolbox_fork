@@ -1678,7 +1678,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
           m_pMapper->SetBestResponse(&best_response); 
         }
         catch (std::exception & e) {
-          throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "kim
+          throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "
                   "unable to publish set best response!");
         }
         
