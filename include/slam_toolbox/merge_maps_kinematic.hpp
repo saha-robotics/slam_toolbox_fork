@@ -31,7 +31,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "interactive_markers/interactive_marker_server.hpp"
 #include "interactive_markers/menu_handler.hpp"
-#include "tf2_ros/transform_broadcaster.h"
+#include "tf2_ros/static_transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/message_filter.h"
 #include "tf2/LinearMath/Matrix3x3.h"
@@ -92,7 +92,7 @@ private:
   std::vector<std::unique_ptr<karto::Dataset>> dataset_vec_;
 
   // TF
-  std::unique_ptr<tf2_ros::TransformBroadcaster> tfB_;
+  std::unique_ptr<tf2_ros::StaticTransformBroadcaster> tfB_;
 
   // visualization
   std::unique_ptr<interactive_markers::InteractiveMarkerServer> interactive_server_;
