@@ -1962,6 +1962,9 @@ public:
 
 public:
 
+  /** 
+   * Purpose of this function is set the best response to localization health information
+   */
   double * m_pbestResponse;
   double * GetBestResponse();
   void  SetBestResponse(double * pBestResponse);
@@ -2161,9 +2164,9 @@ private:
 
 public:
   void SetUseScanMatching(kt_bool val) {m_pUseScanMatching->SetValue(val);}
-
-protected:
   kt_bool m_Initialized;
+protected:
+
   kt_bool m_Deserialized;
 
   ScanMatcher * m_pSequentialScanMatcher;

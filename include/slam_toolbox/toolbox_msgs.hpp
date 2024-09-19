@@ -39,5 +39,6 @@
 #include "slam_toolbox/srv/deserialize_pose_graph.hpp"
 #include "slam_toolbox/srv/merge_maps.hpp"
 #include "slam_toolbox/srv/add_submap.hpp"
+#include "slam_toolbox/srv/desired_pose_checker.hpp"
 
 #endif  // SLAM_TOOLBOX__TOOLBOX_MSGS_HPP_

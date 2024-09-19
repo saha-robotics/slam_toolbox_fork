@@ -49,6 +49,8 @@
 #include "slam_toolbox/map_saver.hpp"
 #include "slam_toolbox/loop_closure_assistant.hpp"
 
+#include <std_msgs/msg/float32.hpp> // TODO: change here idk
+
 namespace slam_toolbox
 {
 
@@ -135,6 +137,7 @@ protected:
   std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>> sst_;
   std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::MapMetaData>> sstm_;
   std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>> pose_pub_;
+  std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Float32>> localization_health_pub_; // TODO: Change here
   std::shared_ptr<rclcpp::Service<nav_msgs::srv::GetMap>> ssMap_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::Pause>> ssPauseMeasurements_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::SerializePoseGraph>> ssSerialize_;
@@ -152,6 +155,16 @@ protected:
   double position_covariance_scale_;
   double yaw_covariance_scale_;
   bool first_measurement_, enable_interactive_mode_;
+
+  // Position search service params
+  double position_search_distance_;
+  double position_search_resolution_;
+  double position_search_smear_deviation_;
+  double position_search_fine_angle_offset_;
+  double position_search_coarse_angle_offset_;
+  double position_search_coarse_angle_resolution_;
+  double position_search_minimum_best_response_;
+  bool position_search_do_relocalization_;
 
   // Book keeping
   std::unique_ptr<mapper_utils::SMapper> smapper_;
@@ -173,6 +186,7 @@ protected:
   nav_msgs::srv::GetMap::Response map_;
   ProcessType processor_type_;
   std::unique_ptr<karto::Pose2> process_near_pose_;
+  std::unique_ptr<karto::Pose2> process_desired_pose_;
   tf2::Transform reprocessing_transform_;
 
   // pluginlib

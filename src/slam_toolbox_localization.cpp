@@ -39,6 +39,12 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::bind(&LocalizationSlamToolbox::clearLocalizationBuffer, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  ssGetBestResponse_ = this->create_service<slam_toolbox::srv::DesiredPoseChecker>(
+      "slam_toolbox/desired_pose_check",
+      std::bind(&LocalizationSlamToolbox::desiredPoseCheck, this,
+      std::placeholders::_1, std::placeholders::_2));
+
+
   // in localization mode, we cannot allow for interactive mode
   enable_interactive_mode_ = false;
 
@@ -122,6 +128,7 @@ void LocalizationSlamToolbox::laserCallback(
   scan_header = scan->header;
   // no odom info
   Pose2 pose;
+  RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Processing scans.");
   if (!pose_helper_->getOdomPose(pose, scan->header.stamp)) {
     RCLCPP_WARN(get_logger(), "Failed to compute odom pose");
     return;
@@ -148,10 +155,19 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   Pose2 & odom_pose)
 /*****************************************************************************/
 {
+  // dirty storage:
+  last_laser_stored_ = laser;
+  last_scan_stored_ = scan;
+  last_odom_pose_stored_ = odom_pose;
+  have_scan_values_ = true;
+
   boost::mutex::scoped_lock l(pose_mutex_);
 
   if (processor_type_ == PROCESS_LOCALIZATION && process_near_pose_) {
     processor_type_ = PROCESS_NEAR_REGION;
+  }
+  if (processor_type_ == PROCESS_LOCALIZATION && process_desired_pose_) {
+    processor_type_ = PROCESS_DESIRED_POSE;
   }
 
   LocalizedRangeScan * range_scan = getLocalizedRangeScan(
@@ -171,38 +187,241 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
         "valid region request. Ignoring scan.");
       return nullptr;
     }
-
-    // set our position to the requested pose and process
+    21
+    std::cout << "LocalizationSlamToolbox: processing nearregion" << std::endl;
+    // smapper_->getMapper()->setParamDoLoopClosing(true);
+    // set our position to the requested pose and proces
     range_scan->SetOdometricPose(*process_near_pose_);
     range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
     process_near_pose_.reset(nullptr);
     processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
-
+    // smapper_->getMapper()->setParamDoLoopClosing(false);
     // reset to localization mode
     update_reprocessing_transform = true;
     processor_type_ = PROCESS_LOCALIZATION;
-  } else if (processor_type_ == PROCESS_LOCALIZATION) {
+  }else if (processor_type_ == PROCESS_DESIRED_POSE) {
+
+    range_scan->SetOdometricPose(*process_desired_pose_);
+    range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
+    std::cout << "Starting desired ProcessAgainstNodesNearBy" << std::endl;
+    processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
+
+    if (processed) {
+      double * best_response = smapper_->getMapper()->GetBestResponse();
+      std::cout << "best_response " << *best_response << std::endl;
+      std::cout << "req->minimum_best_response " << position_search_minimum_best_response_ << std::endl;
+      if (best_response != nullptr && *best_response > position_search_minimum_best_response_) {
+          std::cout<< "finded best response, processing localization." << std::endl;
+          if (position_search_do_relocalization_) {
+            std::cout << "range_scan->GetCorrectedPose() before " << range_scan->GetCorrectedPose().GetX() << " " << range_scan->GetCorrectedPose().GetY() << " " << range_scan->GetCorrectedPose().GetHeading() << std::endl;
+            std::cout << "range_scan->GetOdometricPose() before " << range_scan->GetOdometricPose().GetX() << " " << range_scan->GetOdometricPose().GetY() << " " << range_scan->GetOdometricPose().GetHeading() << std::endl;
+            setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
+              scan->header.stamp, true);
+
+            publishPose(range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+
+            // processed = smapper_->getMapper()->ProcessLocalization(range_scan, &covariance);
+            std::cout << "range_scan->GetCorrectedPose() after " << range_scan->GetCorrectedPose().GetX() << " " << range_scan->GetCorrectedPose().GetY() << " " << range_scan->GetCorrectedPose().GetHeading() << std::endl;
+            std::cout << "range_scan->GetOdometricPose() after " << range_scan->GetOdometricPose().GetX() << " " << range_scan->GetOdometricPose().GetY() << " " << range_scan->GetOdometricPose().GetHeading() << std::endl;
+          }
+          // todo add the last pose values and do setodometric and correctedpose again.
+          else {
+            range_scan->SetOdometricPose(odom_pose);
+            range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
+          }
+      }
+      smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(this->get_parameter("correlation_search_space_dimension").as_double());
+      smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(this->get_parameter("correlation_search_space_resolution").as_double());
+      smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(this->get_parameter("correlation_search_space_smear_deviation").as_double());
+      smapper_->getMapper()->setParamLoopSearchSpaceDimension(this->get_parameter("loop_search_space_dimension").as_double());
+      smapper_->getMapper()->setParamFineSearchAngleOffset(this->get_parameter("fine_search_angle_offset").as_double());
+      smapper_->getMapper()->setParamCoarseSearchAngleOffset(this->get_parameter("coarse_search_angle_offset").as_double());
+      smapper_->getMapper()->setParamCoarseAngleResolution(this->get_parameter("coarse_angle_resolution").as_double());
+      smapper_->getMapper()->setParamLinkMatchMinimumResponseFine(this->get_parameter("link_match_minimum_response_fine").as_double());
+      smapper_->getMapper()->setParamLoopSearchMaximumDistance(this->get_parameter("loop_search_maximum_distance").as_double());
+      smapper_->getMapper()->setParamDoLoopClosing(this->get_parameter("do_loop_closing").as_bool());      
+    }
+    process_desired_pose_.reset(nullptr);
+
+  }else if (processor_type_ == PROCESS_LOCALIZATION) {
     processed = smapper_->getMapper()->ProcessLocalization(range_scan, &covariance);
     update_reprocessing_transform = false;
-  } else {
+  } 
+  else {
     RCLCPP_FATAL(get_logger(), "LocalizationSlamToolbox: "
       "No valid processor type set! Exiting.");
     exit(-1);
   }
 
-  // if successfully processed, create odom to map transformation
   if (!processed) {
     delete range_scan;
     range_scan = nullptr;
-  } else {
-    // compute our new transform
-    setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
-      scan->header.stamp, update_reprocessing_transform);
+  } 
+  else{ 
+    if (processor_type_ != PROCESS_DESIRED_POSE) {
+      setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
+        scan->header.stamp, update_reprocessing_transform);
 
-    publishPose(range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+      publishPose(range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+    }   
+  }
+  if (processor_type_ == PROCESS_DESIRED_POSE){
+    processor_type_ = PROCESS_LOCALIZATION;
   }
 
   return range_scan;
+}
+
+/*****************************************************************************/
+bool LocalizationSlamToolbox::desiredPoseCheck(
+    const std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Request> req,
+    std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Response> res) 
+/*****************************************************************************/
+{
+  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+  std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+ 
+
+  if (req->pose_x == 0.0 || req->pose_y == 0.0) {
+      RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided.");
+      res->message = "Error: pose_x or pose_y is missing. Please use it";
+      res->success = false;
+      return false;
+  }
+
+  if (req->do_relocalization){
+    RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Searching for best response with relocalize");
+    position_search_do_relocalization_ = true;
+  } else {
+    RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Searching for best response without relocalize");
+    position_search_do_relocalization_ = false;
+  }
+
+  {
+    boost::mutex::scoped_lock l(pose_mutex_);
+    process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, 0.0);
+  }
+
+  first_measurement_ = true;
+
+  {
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance_);
+    smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_distance_-1);
+    smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset_);
+    smapper_->getMapper()->setParamCoarseSearchAngleOffset(position_search_coarse_angle_offset_);
+    smapper_->getMapper()->setParamCoarseAngleResolution(position_search_coarse_angle_resolution_);
+    smapper_->getMapper()->setParamLinkMatchMinimumResponseFine(position_search_minimum_best_response_);
+    smapper_->getMapper()->setParamLoopSearchSpaceResolution(position_search_resolution_);
+    smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(position_search_smear_deviation_);
+    // smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(position_search_distance_);
+    smapper_->getMapper()->setParamDoLoopClosing(true);
+    smapper_->getMapper()->m_Initialized = false;
+
+    if (req->search_distance != 0.0) {
+      position_search_distance_ = req->search_distance;
+      // smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance_);
+      // smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_distance_-1);
+    } 
+    
+    smapper_->clearLocalizationBuffer();  
+  }
+
+
+  res->message = "processor_type_ changed to DESIRED_POSE";
+  res->success = true;
+  return false;
+
+  // RCLCPP_INFO(get_logger(),
+  //   "LocalizePoseCallback: Localizing to: (%0.2f %0.2f), theta=%0.2f",
+  //   msg->pose.pose.position.x, msg->pose.pose.position.y,
+  //   tf2::getYaw(msg->pose.pose.orientation));
+
+  // if (!have_scan_values_) {
+  //   res->message = "No scan values stored try later";
+  //   res->success = false;
+  //   return false;
+  // }
+  // else{
+  //     // for (double angle = 0.0; angle <= 360.0; angle += angle_resolution) {
+  //       bool processed = false;
+    //     {    
+    //       boost::mutex::scoped_lock l(pose_mutex_);
+    //       process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, 0.0);
+    //       range_scan = getLocalizedRangeScan(last_laser_stored_, last_scan_stored_, last_odom_pose_stored_);
+
+    //       // first_measurement_  = true;
+    //       boost::mutex::scoped_lock lock(smapper_mutex_);
+    //       range_scan->SetOdometricPose(*process_desired_pose_);
+    //       range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
+    //       std::cout << "Starting ProcessAgainstNodesNearBy" << std::endl;
+    //       processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
+    //       std::cout << "Finished ProcessAgainstNodesNearBy\n\n\n\n\n\n\n" << std::endl;
+        
+    //       if (processed) {
+    //         double * best_response = smapper_->getMapper()->GetBestResponse();
+    //         std::cout << "best_response " << *best_response << std::endl;
+    //         std::cout << "req->minimum_best_response " << initial_minimum_best_response << std::endl;
+    //         if (best_response != nullptr && *best_response > initial_minimum_best_response) {
+    //             std::cout<< "finded best response, processing localization." << std::endl;
+
+    //             if (initial_do_relocalization) {
+    //               std::cout << "range_scan->GetCorrectedPose() before" << range_scan->GetCorrectedPose().GetX() << " " << range_scan->GetCorrectedPose().GetY() << " " << range_scan->GetCorrectedPose().GetHeading() << std::endl;
+    //               std::cout << "range_scan->GetOdometricPose() before" << range_scan->GetOdometricPose().GetX() << " " << range_scan->GetOdometricPose().GetY() << " " << range_scan->GetOdometricPose().GetHeading() << std::endl;
+    //               setTransformFromPoses(range_scan->GetCorrectedPose(), last_odom_pose_stored_,
+    //                 last_scan_stored_->header.stamp, true);
+
+    //               publishPose(range_scan->GetCorrectedPose(), covariance, last_scan_stored_->header.stamp);
+    //               processed = smapper_->getMapper()->ProcessLocalization(range_scan, &covariance);
+    //               std::cout << "range_scan->GetCorrectedPose() after" << range_scan->GetCorrectedPose().GetX() << " " << range_scan->GetCorrectedPose().GetY() << " " << range_scan->GetCorrectedPose().GetHeading() << std::endl;
+    //               std::cout << "range_scan->GetOdometricPose() after " << range_scan->GetOdometricPose().GetX() << " " << range_scan->GetOdometricPose().GetY() << " " << range_scan->GetOdometricPose().GetHeading() << std::endl;
+    //               addScan(last_laser_stored_, last_scan_stored_, last_odom_pose_stored_);
+    //             }
+    //             // todo add the last pose values and do setodometric and correctedpose again.
+    //             else {
+    //               range_scan->SetOdometricPose(last_odom_pose_stored_);
+    //               range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
+    //             }
+    //             smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
+    //             smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
+    //             smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
+    //             smapper_->getMapper()->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
+    //             smapper_->getMapper()->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
+    //             smapper_->getMapper()->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
+    //             smapper_->getMapper()->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
+    //             smapper_->getMapper()->setParamLinkMatchMinimumResponseFine(initial_minimum_link_best_response);
+    //             smapper_->getMapper()->setParamLoopSearchMaximumDistance(initial_loop_search_maximum_distance);
+    //             smapper_->getMapper()->setParamDoLoopClosing(initial_do_loop_closing_value);
+
+    //             res->message = std::to_string(*best_response);  
+    //             res->success = true;
+    //             return true; 
+    //         } else {
+    //             // {
+    //             //   boost::mutex::scoped_lock lock(smapper_mutex_);
+    //               smapper_->clearLocalizationBuffer();
+    //             // }
+
+    //             smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(initial_correlation_search_space_dimension);
+    //             smapper_->getMapper()->setParamCorrelationSearchSpaceResolution(initial_correlation_search_space_resolution);
+    //             smapper_->getMapper()->setParamCorrelationSearchSpaceSmearDeviation(initial_correlation_search_space_smear_deviation);
+    //             smapper_->getMapper()->setParamLoopSearchSpaceDimension(initial_loop_search_space_dimension);
+    //             smapper_->getMapper()->setParamFineSearchAngleOffset(initial_fine_search_angle_offset);
+    //             smapper_->getMapper()->setParamCoarseSearchAngleOffset(initial_coarse_search_angle_offset);
+    //             smapper_->getMapper()->setParamCoarseAngleResolution(initial_coarse_angle_resolution);
+    //             smapper_->getMapper()->setParamLinkMatchMinimumResponseFine(initial_minimum_link_best_response);
+    //             smapper_->getMapper()->setParamLoopSearchMaximumDistance(initial_loop_search_maximum_distance);
+    //             smapper_->getMapper()->setParamDoLoopClosing(initial_do_loop_closing_value);
+    //             res->message = "Couldn't find bestResponse";
+    //             res->success = false;
+    //             return false;
+    //         }
+    //       }
+    //     }
+    //   res->message = "Couldn't find with this resolution at desired time, halving the angle_resolution and decreasing best_response then search again.";
+    //   res->success = false;
+    //   return false;
+    // }
 }
 
 /*****************************************************************************/
