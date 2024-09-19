@@ -1584,9 +1584,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 #endif
     Pose2 bestPose;
     Matrix3 covariance;
-
-    // std::cout <<"pScan->GetSensorPose() " << pScan->GetSensorPose() << std::endl;
-
     kt_double coarseResponse = m_pLoopScanMatcher->MatchScan(pScan, candidateChain,
         bestPose, covariance, false, false);
 
@@ -1612,15 +1609,25 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
       std::endl;
     stream << "            var: " << covariance(0, 0) << ",  " << covariance(1, 1) <<
       " (< " << m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue() << ")";
-
+#ifdef KARTO_DEBUG
     std::cout << "Coarse Response: " << coarseResponse << " (> " << m_pMapper->m_pLoopMatchMinimumResponseCoarse->GetValue() << ")" << std::endl;
 
     std::cout << "search_space_dimension " << m_pMapper->m_pCorrelationSearchSpaceDimension->GetValue() << std::endl;
     std::cout << "loop_search_dimension " << m_pMapper->m_pLoopSearchSpaceDimension->GetValue() << std::endl;
     std::cout << "search_space_resolution " << m_pMapper->m_pCorrelationSearchSpaceResolution->GetValue() << std::endl;
     std::cout << "search_space_smear_deviation " << m_pMapper->m_pCorrelationSearchSpaceSmearDeviation->GetValue() << std::endl;
+#endif
 
     m_pMapper->FireLoopClosureCheck(stream.str());
+
+    double coarsedResponse = coarseResponse;
+    try
+    {
+      m_pMapper->SetBestResponse(&coarsedResponse);
+    }
+    catch (std::exception & e) {
+      std::cout << "Exception caught: " << e.what() << std::endl;
+    }
 
     if ((coarseResponse > m_pMapper->m_pLoopMatchMinimumResponseCoarse->GetValue()) &&
       (covariance(0, 0) < m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue()) &&
@@ -1639,6 +1646,15 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
       kt_double fineResponse = m_pMapper->m_pSequentialScanMatcher->MatchScan(&tmpScan, 
           candidateChain,
           bestPose, covariance, false);
+
+      double finedResponse = fineResponse; 
+      try
+      {
+        m_pMapper->SetBestResponse(&finedResponse);
+      }
+      catch (std::exception & e) {
+        std::cout << "Exception caught: " << e.what() << std::endl;
+      }
 
       std::stringstream stream1;
       stream1 << "FINE RESPONSE: " << fineResponse << " (>" <<
@@ -1666,6 +1682,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 
 #ifdef KARTO_DEBUG
     std::cout << "\n\n\nLoop Closed!, starting pose correction\n\n\n " << std::endl;
+    std::cout << "\n bestPose: " << bestPose << " bestResponse: " << best_response << std::endl;
     std::cout << "pscan sensor pose: " << pScan->GetSensorPose() << std::endl;
     std::cout << "pscan corrected pose: " << pScan->GetCorrectedPose() << std::endl;
     std::cout << "pscan odometric pose: " << pScan->GetOdometricPose() << std::endl;
@@ -1722,6 +1739,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 #ifdef KARTO_DEBUG
   std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
   std::cout << "pscan sensor pose: " << pScan->GetSensorPose() << std::endl;
+  std::cout << "pscan odometric pose: " << pScan->GetOdometricPose() << std::endl;
 
   end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
@@ -2183,21 +2201,6 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
   std::cout << "rStartNum size " << rStartNum << std::endl;
   std::cout << "Calculating in this pose: " << pose.GetX() << " " << pose.GetY() << std::endl;
   std::cout << "Nearlinkedscans size: " << nearLinkedScans.size() << std::endl;
-  // std::cout << "Near Linked Scans(Founded chain's):" << std::endl;
-  // for (const auto& scan : nearLinkedScans) {
-  //     if (scan != nullptr) {  // Null pointer kontrolü
-  //         std::cout << "Scan Position: (" 
-  //                   << scan->GetCorrectedPose().GetX() << ", "
-  //                   << scan->GetCorrectedPose().GetY() << ", "
-  //                   << scan->GetCorrectedPose().GetHeading() << ")" << std::endl;
-
-  //         std::cout << "Scan Timestamp: " << scan->GetTime() << std::endl;
-  //         // Diğer istediğiniz bilgileri ekleyebilirsiniz.
-  //     }
-  //     else {
-  //         std::cout << "Null scan found!" << std::endl;
-  //     }
-  // }
   std::chrono::time_point<std::chrono::system_clock> start, end;
   start = std::chrono::system_clock::now(); 
 #endif
