@@ -237,23 +237,6 @@ void LocalizationSlamToolbox::setInitialParametersForDesiredPose(double position
                           double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
                           double position_search_smear_deviation,bool do_loop_closing_flag){
 
-  // double initial_correlation_search_space_dimension = this->get_parameter("correlation_search_space_dimension").as_double();
-  // double initial_correlation_search_space_resolution = this->get_parameter("correlation_search_space_resolution").as_double();
-  // double initial_correlation_search_space_smear_deviation = this->get_parameter("correlation_search_space_smear_deviation").as_double();
-
-  // double initial_loop_search_space_dimension = this->get_parameter("loop_search_space_dimension").as_double(); 
-  // double initial_loop_search_maximum_distance = this->get_parameter("loop_search_maximum_distance").as_double();
-  // double initial_loop_search_space_resolution = this->get_parameter("loop_search_space_resolution").as_double();
-
-  // double initial_fine_search_angle_offset = this->get_parameter("fine_search_angle_offset").as_double();
-  // double initial_coarse_search_angle_offset = this->get_parameter("coarse_search_angle_offset").as_double();
-  // double initial_coarse_angle_resolution = this->get_parameter("coarse_angle_resolution").as_double();
-
-  // double initial_do_relocalization = this->get_parameter("position_search_do_relocalization").as_bool();
-  // double initial_minimum_best_response = this->get_parameter("position_search_minimum_best_response").as_double();
-  // double initial_minimum_link_best_response = this->get_parameter("link_match_minimum_response_fine").as_double();
-  // bool   initial_do_loop_closing_value = this->get_parameter("do_loop_closing").as_bool();
-
   smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance);
   smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_maximum_distance);
   smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset);
@@ -312,7 +295,6 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
 
     if (req->search_distance != 0.0) {
       position_search_distance_ = req->search_distance;
-      //Redefinition of serach distance defined in the service
       setInitialParametersForDesiredPose(position_search_distance_,((position_search_distance_*0.5)-1), position_search_fine_angle_offset_,
                             position_search_coarse_angle_offset_, position_search_coarse_angle_resolution_, 
                             position_search_resolution_, position_search_smear_deviation_,true); 
@@ -339,7 +321,7 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
           processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
           std::cout << "Finished ProcessAgainstNodesNearBy\n\n\n\n\n\n\n" << std::endl;
         
-          if (processed) {            
+          if (processed) {
             std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
             double best_response = response->bestResponse;
             double best_pose_x = response->bestPoseX;
