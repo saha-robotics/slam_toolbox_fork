@@ -2259,12 +2259,12 @@ void MapperGraph::CorrectPoses()
   ScanSolver * pSolver = m_pMapper->m_pScanOptimizer;
   if (pSolver != NULL) {
     pSolver->Compute();
+#ifdef KARTO_DEBUG
     std::cout << "\n\n\n\nCorrectPose executed\n\n\n\n" << std::endl;
+#endif
     const_forEach(ScanSolver::IdPoseVector, &pSolver->GetCorrections())
     {
       LocalizedRangeScan * scan = m_pMapper->m_pMapperSensorManager->GetScan(iter->first);
-      std::cout << "Scan: " << iter->first << std::endl;
-      std::cout << "Corrected Scan Pose: " << iter->second << std::endl;
       if (scan == NULL) {
         continue;
       }
