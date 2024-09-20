@@ -1594,15 +1594,18 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
     * The reason for getting the bestresponse here instead of the Matchscan function is that the other functions calling Matchscan always >>> 
     * receive outputs greater than 0.5 from bestresponse, regardless of whether the robot's position is correct or not.
     */
-    double best_response = coarseResponse; 
+    auto best_solution_info = std::make_shared<Mapper::LocalizationInfos>();
+
+    best_solution_info->bestResponse = coarseResponse;
+    best_solution_info->bestPoseX = pScan->GetSensorPose().GetX();
+    best_solution_info->bestPoseY = pScan->GetSensorPose().GetY();
 
     try
     {
-      m_pMapper->SetBestResponse(&best_response);  
+        m_pMapper->SetBestResponse(best_solution_info);   
     }
     catch (std::exception & e) {
-      throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "
-              "unable to publish set best response!");
+        throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - unable to publish set best response!");
     }
 
     std::stringstream stream;
@@ -1621,16 +1624,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 #endif
 
     m_pMapper->FireLoopClosureCheck(stream.str());
-
-    double coarsedResponse = coarseResponse;
-    try
-    {
-      m_pMapper->SetBestResponse(&coarsedResponse);
-    }
-    catch (std::exception & e) {
-      std::cout << "Exception caught: " << e.what() << std::endl;
-    }
-
+    
     if ((coarseResponse > m_pMapper->m_pLoopMatchMinimumResponseCoarse->GetValue()) &&
       (covariance(0, 0) < m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue()) &&
       (covariance(1, 1) < m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue()))
@@ -1649,15 +1643,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
           candidateChain,
           bestPose, covariance, false);
 
-      double finedResponse = fineResponse; 
-      try
-      {
-        m_pMapper->SetBestResponse(&finedResponse);
-      }
-      catch (std::exception & e) {
-        std::cout << "Exception caught: " << e.what() << std::endl;
-      }
-
       std::stringstream stream1;
       stream1 << "FINE RESPONSE: " << fineResponse << " (>" <<
         m_pMapper->m_pLoopMatchMinimumResponseFine->GetValue() << ")" << std::endl;
@@ -1668,15 +1653,18 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
       } else {
         m_pMapper->FireBeginLoopClosure("Closing loop...");
 
-        double best_response = fineResponse; 
+        auto best_solution_info = std::make_shared<Mapper::LocalizationInfos>(); 
+
+        best_solution_info->bestResponse = fineResponse;
+        best_solution_info->bestPoseX = pScan->GetSensorPose().GetX();
+        best_solution_info->bestPoseY = pScan->GetSensorPose().GetY();
 
         try
         {
-          m_pMapper->SetBestResponse(&best_response); 
+            m_pMapper->SetBestResponse(best_solution_info);   
         }
         catch (std::exception & e) {
-          throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "
-                  "unable to publish set best response!");
+            throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - unable to publish set best response!");
         }
         
         pScan->SetSensorPose(bestPose);
@@ -1684,7 +1672,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 
 #ifdef KARTO_DEBUG
     std::cout << "\n\n\nLoop Closed!, starting pose correction\n\n\n " << std::endl;
-    std::cout << "\n bestPose: " << bestPose << " bestResponse: " << best_response << std::endl;
+    std::cout << "\n bestPose: " << bestPose << " bestResponse: " << fineResponse << std::endl;
     std::cout << "pscan sensor pose: " << pScan->GetSensorPose() << std::endl;
     std::cout << "pscan corrected pose: " << pScan->GetCorrectedPose() << std::endl;
     std::cout << "pscan odometric pose: " << pScan->GetOdometricPose() << std::endl;
@@ -1866,16 +1854,22 @@ void MapperGraph::LinkNearChains(
     * The reason for getting the bestresponse here instead of the Matchscan function is that the other functions calling Matchscan always >>> 
     * receive outputs greater than 0.5 from bestresponse, regardless of whether the robot's position is correct or not.
     */
-    double best_response = response; 
+    auto best_solution_info = std::make_shared<Mapper::LocalizationInfos>(); 
+
+
+    best_solution_info->bestResponse = response;
+    best_solution_info->bestPoseX = pScan->GetSensorPose().GetX();
+    best_solution_info->bestPoseY = pScan->GetSensorPose().GetY();
 
     try
     {
-      m_pMapper->SetBestResponse(&best_response);  
+        m_pMapper->SetBestResponse(best_solution_info);   
     }
     catch (std::exception & e) {
-      throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - "
-              "unable to publish set best response!");
+        throw std::runtime_error("LOCALIZATIONHEALTH PUBLISHER FATAL ERROR - unable to publish set best response!");
     }
+
+
     if (response > m_pMapper->m_pLinkMatchMinimumResponseFine->GetValue() - KT_TOLERANCE) {
       rMeans.push_back(mean);
       rCovariances.push_back(covariance);
@@ -2306,7 +2300,9 @@ Mapper::Mapper()
   m_pMapperSensorManager(NULL),
   m_pGraph(NULL),
   m_pScanOptimizer(NULL),
-  m_pbestResponse(new double(0.0))
+  m_pbestResponse(std::make_shared<double>(0.0)),
+  m_pbestPoseX(std::make_shared<double>(0.0)),     
+  m_pbestPoseY(std::make_shared<double>(0.0)) 
 {
   InitializeParameters();
 }
@@ -2322,7 +2318,9 @@ Mapper::Mapper(const std::string & rName)
   m_pMapperSensorManager(NULL),
   m_pGraph(NULL),
   m_pScanOptimizer(NULL),
-  m_pbestResponse(new double(0.0))
+  m_pbestResponse(std::make_shared<double>(0.0)),
+  m_pbestPoseX(std::make_shared<double>(0.0)),     
+  m_pbestPoseY(std::make_shared<double>(0.0)) 
 {
   InitializeParameters();
 }
@@ -2924,10 +2922,10 @@ void Mapper::Reset()
     delete m_pMapperSensorManager;
     m_pMapperSensorManager = NULL;
   }
-  if (m_pbestResponse) {
-    delete m_pbestResponse;
-    m_pbestResponse = NULL;
-  }
+  // if (m_pbestResponse) {
+  //     m_pbestResponse.reset();  
+  // }
+  
   m_Initialized = false;
   m_Deserialized = false;
   while (!m_LocalizationScanVertices.empty()) {
@@ -3558,16 +3556,26 @@ void Mapper::FireEndLoopClosure(const std::string & rInfo) const
   }
 }
 
-double* Mapper::GetBestResponse()
+std::shared_ptr<Mapper::LocalizationInfos> Mapper::GetBestResponse() const
 {
-  return m_pbestResponse; 
+    auto response = std::make_shared<LocalizationInfos>();
+    response->bestResponse = *m_pbestResponse;
+    response->bestPoseX = *m_pbestPoseX;
+    response->bestPoseY = *m_pbestPoseY;
+    return response;
 }
 
-void Mapper::SetBestResponse(double* pBestResponse)
+void Mapper::SetBestResponse(const std::shared_ptr<Mapper::LocalizationInfos>& response)
 {
-  if (pBestResponse != nullptr) {
-    *m_pbestResponse = *pBestResponse; 
-  }
+    if (response) {
+        if (m_pbestResponse && m_pbestPoseX && m_pbestPoseY) { 
+            *m_pbestResponse = response->bestResponse;
+            *m_pbestPoseX = response->bestPoseX;
+            *m_pbestPoseY = response->bestPoseY;
+        } else {
+            throw std::runtime_error("Mapper FATAL ERROR - One or more bestResponse pointers are null.");
+        }
+    }
 }
 
 void Mapper::SetScanSolver(ScanSolver * pScanOptimizer)
