@@ -581,23 +581,25 @@ kt_double ScanMatcher::MatchScan(
   //TODO: Baha LOOK HERE
 
   // set up correlation grid  
-
+#ifdef KARTO_DEBUG
   std::cout << "scanPose.GetPosition() values " << scanPose.GetPosition() << std::endl;
+#endif
   AddScans(rBaseScans, scanPose.GetPosition());
-
+#ifdef KARTO_DEBUG
   std::cout << "m_pSearchSpaceProbs width " << m_pSearchSpaceProbs->GetWidth() << std::endl;
   std::cout << "m_pSearchSpaceProbs height " << m_pSearchSpaceProbs->GetHeight() << std::endl;
+#endif
   // compute how far to search in each direction
   Vector2<kt_double> searchDimensions(m_pSearchSpaceProbs->GetWidth(),
     m_pSearchSpaceProbs->GetHeight());
   Vector2<kt_double> coarseSearchOffset(0.5 * (searchDimensions.GetX() - 1) *
     m_pCorrelationGrid->GetResolution(),
     0.5 * (searchDimensions.GetY() - 1) * m_pCorrelationGrid->GetResolution());
-
+#ifdef KARTO_DEBUG
   std::cout << "m_pCorrelationGrid " << m_pCorrelationGrid->GetResolution() << std::endl;
   std::cout << "searchDimensions " << searchDimensions << std::endl;
   std::cout << "coarseSearchOffset " << coarseSearchOffset << std::endl;
-
+#endif
   // a coarse search only checks half the cells in each dimension
   Vector2<kt_double> coarseSearchResolution(2 * m_pCorrelationGrid->GetResolution(),
     2 * m_pCorrelationGrid->GetResolution());
@@ -2261,7 +2263,8 @@ void MapperGraph::CorrectPoses()
     const_forEach(ScanSolver::IdPoseVector, &pSolver->GetCorrections())
     {
       LocalizedRangeScan * scan = m_pMapper->m_pMapperSensorManager->GetScan(iter->first);
-      
+      std::cout << "Scan: " << iter->first << std::endl;
+      std::cout << "Corrected Scan Pose: " << iter->second << std::endl;
       if (scan == NULL) {
         continue;
       }
