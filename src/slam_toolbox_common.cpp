@@ -297,16 +297,20 @@ void SlamToolbox::publishTransformLoop(
       rclcpp::Time scan_timestamp = scan_header.stamp;
 
       //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
-      double * best_response =smapper_->getMapper()->GetBestResponse();
+      std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
+
+      double best_response = response->bestResponse;
+      double best_pose_x = response->bestPoseX;
+      double best_pose_y = response->bestPoseY;
       static double previous_best_response = 0.0;  
 
-      if (best_response != nullptr && *best_response > 0.02) {
+      if (best_response > 0.02) {
           try {
-            if (*best_response != previous_best_response) {
+            if (best_response != previous_best_response) {
                 std_msgs::msg::Float32 msg;
-                msg.data = static_cast<float>(*best_response);  // TODO: Change here
+                msg.data = static_cast<float>(best_response);  
                 localization_health_pub_->publish(msg);
-                previous_best_response = *best_response;  
+                previous_best_response = best_response;  
             }
           } 
           catch (std::exception & e) {
@@ -314,7 +318,6 @@ void SlamToolbox::publishTransformLoop(
             RCLCPP_ERROR(this->get_logger(), "Exception caught while dereferencing best_response: %s", e.what());
           }
       } 
-      //    
 
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {

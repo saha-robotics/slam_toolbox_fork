@@ -282,27 +282,6 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
     smapper_->clearLocalizationBuffer();
   }
 
-  /*
-  Yaml parameters definitions for setting the parameters after process finished
-  */
-  // double initial_correlation_search_space_dimension = this->get_parameter("correlation_search_space_dimension").as_double();
-  // double initial_correlation_search_space_resolution = this->get_parameter("correlation_search_space_resolution").as_double();
-  // double initial_correlation_search_space_smear_deviation = this->get_parameter("correlation_search_space_smear_deviation").as_double();
-
-  // double initial_loop_search_space_dimension = this->get_parameter("loop_search_space_dimension").as_double(); 
-  // double initial_loop_search_maximum_distance = this->get_parameter("loop_search_maximum_distance").as_double();
-  // double initial_loop_search_space_resolution = this->get_parameter("loop_search_space_resolution").as_double();
-  // // double initial_loop_search_space_smear_deviation = this->get_parameter("loop_search_space_smear_deviation").as_double();
-
-  // double initial_fine_search_angle_offset = this->get_parameter("fine_search_angle_offset").as_double();
-  // double initial_coarse_search_angle_offset = this->get_parameter("coarse_search_angle_offset").as_double();
-  // double initial_coarse_angle_resolution = this->get_parameter("coarse_angle_resolution").as_double();
-
-  // double initial_do_relocalization = this->get_parameter("position_search_do_relocalization").as_bool();
-  // double initial_minimum_best_response = this->get_parameter("position_search_minimum_best_response").as_double();
-  // double initial_minimum_link_best_response = this->get_parameter("link_match_minimum_response_fine").as_double();
-  // bool   initial_do_loop_closing_value = this->get_parameter("do_loop_closing").as_bool();  
-
   if (req->pose_x == 0.0 || req->pose_y == 0.0) {
       RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided.");
       res->message = "Error: pose_x or pose_y is missing. Please use it";
@@ -333,12 +312,11 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
 
     if (req->search_distance != 0.0) {
       position_search_distance_ = req->search_distance;
-      // setInitialParametersForDesiredPose(position_search_distance_,((position_search_distance_*0.5)-1), position_search_fine_angle_offset_,
-                            // position_search_coarse_angle_offset_, position_search_coarse_angle_resolution_, 
-                            // position_search_resolution_, position_search_smear_deviation_,true); 
-
+      //Redefinition of serach distance defined in the service
+      setInitialParametersForDesiredPose(position_search_distance_,((position_search_distance_*0.5)-1), position_search_fine_angle_offset_,
+                            position_search_coarse_angle_offset_, position_search_coarse_angle_resolution_, 
+                            position_search_resolution_, position_search_smear_deviation_,true); 
     } 
-    
   }
 
   if (!have_scan_values_) {
@@ -361,11 +339,15 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
           processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
           std::cout << "Finished ProcessAgainstNodesNearBy\n\n\n\n\n\n\n" << std::endl;
         
-          if (processed) {
-            double * best_response = smapper_->getMapper()->GetBestResponse();
-            std::cout << "best_response " << *best_response << std::endl;
+          if (processed) {            
+            std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
+            double best_response = response->bestResponse;
+            double best_pose_x = response->bestPoseX;
+            double best_pose_y = response->bestPoseY;
+
+            std::cout << "best_response " << best_response << std::endl;
             std::cout << "req->minimum_best_response " << position_search_minimum_best_response_ << std::endl;
-            if (best_response != nullptr && *best_response > position_search_minimum_best_response_) {
+            if (best_response > position_search_minimum_best_response_) {
                 std::cout<< "finded best response, processing localization." << std::endl;
 
                 if (position_search_do_relocalization_) {
@@ -389,7 +371,11 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
                                                   this->get_parameter("coarse_angle_resolution").as_double(),this->get_parameter("loop_search_space_resolution").as_double(),
                                                   this->get_parameter("loop_search_space_smear_deviation").as_double(),this->get_parameter("do_loop_closing").as_bool());
 
-                res->message = std::to_string(*best_response);  
+                res->message = "Found bestResponse";
+                res->relocated_x= static_cast<float>(best_pose_x);
+                res->relocated_y= static_cast<float>(best_pose_y);
+                res->best_response = static_cast<float>(best_response);
+
                 res->success = true;
                 return true; 
             } else {
