@@ -257,7 +257,7 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
 {
   std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
   std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-   Matrix3 covariance;
+  Matrix3 covariance;
   LocalizedRangeScan * range_scan = nullptr;
   covariance.SetToIdentity();
   {
