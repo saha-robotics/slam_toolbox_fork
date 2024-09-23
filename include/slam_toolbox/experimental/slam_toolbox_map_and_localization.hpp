@@ -31,6 +31,7 @@ public:
   virtual ~MapAndLocalizationSlamToolbox() {}
   void loadPoseGraphByParams() override;
   void configure() override;
+  void changeMapTopic(const std::string & map_topic);
 
 protected:
   void laserCallback(

@@ -75,6 +75,9 @@ void SlamToolbox::configure()
   transform_publish_period =
     this->declare_parameter("transform_publish_period",
       transform_publish_period);
+  publish_map_once_ = this->declare_parameter("publish_map_once",
+    publish_map_once_);
+  this->declare_parameter("map_update_interval",10.0);
   threads_.push_back(std::make_unique<boost::thread>(
       boost::bind(&SlamToolbox::publishTransformLoop,
       this, transform_publish_period)));
@@ -348,11 +351,7 @@ void SlamToolbox::publishVisualizations()
   og.info.origin.orientation.w = 1.0;
   og.header.frame_id = map_frame_;
 
-  double map_update_interval = 10;
-  map_update_interval = this->declare_parameter("map_update_interval",
-      map_update_interval);
-  publish_map_once_ = this->declare_parameter("publish_map_once",
-      publish_map_once_);
+  auto map_update_interval = this->get_parameter("map_update_interval").as_double();
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
