@@ -1721,7 +1721,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
     std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
 #endif
 
-        return loopClosed;
+chainging the function default, will be testing that.          // return loopClosed;
       }
     }
     candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
