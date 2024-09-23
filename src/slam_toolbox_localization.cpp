@@ -187,7 +187,6 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
         "valid region request. Ignoring scan.");
       return nullptr;
     }
-    21
     std::cout << "LocalizationSlamToolbox: processing nearregion" << std::endl;
     // smapper_->getMapper()->setParamDoLoopClosing(true);
     // set our position to the requested pose and proces

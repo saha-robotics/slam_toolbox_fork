@@ -1650,15 +1650,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
           candidateChain,
           bestPose, covariance, false);
 
-      double finedResponse = fineResponse; 
-      try
-      {
-        m_pMapper->SetBestResponse(&finedResponse);
-      }
-      catch (std::exception & e) {
-        std::cout << "Exception caught: " << e.what() << std::endl;
-      }
-
       std::stringstream stream1;
       stream1 << "FINE RESPONSE: " << fineResponse << " (>" <<
         m_pMapper->m_pLoopMatchMinimumResponseFine->GetValue() << ")" << std::endl;
@@ -1737,7 +1728,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
     std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
 #endif
 
-        // return loopClosed;
+        return loopClosed;
       }
     }
     candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
@@ -1746,6 +1737,7 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
   std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
   std::cout << "pscan sensor pose: " << pScan->GetSensorPose() << std::endl;
   std::cout << "pscan odometric pose: " << pScan->GetOdometricPose() << std::endl;
+
   end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   std::cout << "----------Calculated time of Matchscan after triggered\n"
@@ -1855,11 +1847,6 @@ void MapperGraph::LinkNearChains(
 #endif
 
     // match scan against "near" chain
-    using namespace std::chrono;
-
-    std::chrono::time_point<std::chrono::system_clock> start, end;
-    start = std::chrono::system_clock::now(); 
-
     kt_double response = m_pMapper->m_pSequentialScanMatcher->MatchScan(pScan, *iter, mean,
         covariance, false);
 
@@ -2210,10 +2197,6 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
   // path of links to the scan of interest
   const LocalizedRangeScanVector nearLinkedScans =
     FindNearLinkedScans(pScan, m_pMapper->m_pLoopSearchMaximumDistance->GetValue());
-
-  std::cout << "FindPossibleLoopClosure nearLinkedScans size: " << nearLinkedScans.size() << std::endl;
-  std::cout << "Near Linked Scans: " << nearLinkedScans.size() << std::endl;
-
 
   kt_int32u nScans =
     static_cast<kt_int32u>(m_pMapper->m_pMapperSensorManager->GetScans(rSensorName).size());
@@ -3230,8 +3213,6 @@ kt_bool Mapper::ProcessLocalization(LocalizedRangeScan * pScan, Matrix3 * covari
   Vertex<LocalizedRangeScan> * scan_vertex = NULL;
   if (m_pUseScanMatching->GetValue()) {
     // add to graph
-    // TODO: Testing here baha
-  
     scan_vertex = m_pGraph->AddVertex(pScan);
     m_pGraph->AddEdges(pScan, cov);
 
@@ -3480,6 +3461,8 @@ kt_bool Mapper::HasMovedEnough(LocalizedRangeScan * pScan, LocalizedRangeScan * 
 
   Pose2 lastScannerPose = pLastScan->GetSensorAt(pLastScan->GetOdometricPose());
   Pose2 scannerPose = pScan->GetSensorAt(pScan->GetOdometricPose());
+  Pose2 lastCorrectedPose = pLastScan->GetCorrectedPose();
+  Pose2 correctedPose = pScan->GetCorrectedPose();
   // test if we have turned enough
   kt_double deltaHeading = math::NormalizeAngle(
     scannerPose.GetHeading() - lastScannerPose.GetHeading());
