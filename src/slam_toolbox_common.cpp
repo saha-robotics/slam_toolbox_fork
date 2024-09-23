@@ -75,6 +75,9 @@ void SlamToolbox::configure()
   transform_publish_period =
     this->declare_parameter("transform_publish_period",
       transform_publish_period);
+  publish_map_once_ = this->declare_parameter("publish_map_once",
+    publish_map_once_);
+  this->declare_parameter("map_update_interval",10.0);
   threads_.push_back(std::make_unique<boost::thread>(
       boost::bind(&SlamToolbox::publishTransformLoop,
       this, transform_publish_period)));
@@ -296,11 +299,29 @@ void SlamToolbox::publishTransformLoop(
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
       rclcpp::Time scan_timestamp = scan_header.stamp;
 
-      auto current_time = this->now();
-      auto last_scan_time = scan_header.stamp;
+      //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
+      std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
 
-      // RCLCPP_INFO(get_logger(), "pasted_time_last_recieved_scan_data = %f", (current_time - last_scan_time).seconds()  );
-      // std::cout << "pasted_time_last_recieved_scan_data" << (current_time - last_scan_time).seconds()<< std::endl;
+      double best_response = response->bestResponse;
+      double best_pose_x = response->bestPoseX;
+      double best_pose_y = response->bestPoseY;
+      static double previous_best_response = 0.0;  
+
+      if (best_response > 0.02) {
+          try {
+            if (best_response != previous_best_response) {
+                std_msgs::msg::Float32 msg;
+                msg.data = static_cast<float>(best_response);  
+                localization_health_pub_->publish(msg);
+                previous_best_response = best_response;  
+            }
+          } 
+          catch (std::exception & e) {
+          //TODO: Write publisher topic when cannot acces the result of health check .
+            RCLCPP_ERROR(this->get_logger(), "Exception caught while dereferencing best_response: %s", e.what());
+          }
+      } 
+
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;
@@ -330,11 +351,7 @@ void SlamToolbox::publishVisualizations()
   og.info.origin.orientation.w = 1.0;
   og.header.frame_id = map_frame_;
 
-  double map_update_interval = 10;
-  map_update_interval = this->declare_parameter("map_update_interval",
-      map_update_interval);
-  publish_map_once_ = this->declare_parameter("publish_map_once",
-      publish_map_once_);
+  auto map_update_interval = this->get_parameter("map_update_interval").as_double();
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
