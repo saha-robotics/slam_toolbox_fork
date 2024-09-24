@@ -1,7 +1,6 @@
 float64 pose_x
 float64 pose_y
 float64 search_distance
-float64 minimum_best_response 
 bool do_relocalization 
 
 ---

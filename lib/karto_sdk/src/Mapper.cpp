@@ -47,7 +47,7 @@ namespace karto
 {
 
 // enable this for verbose debug information
-#define KARTO_DEBUG
+// #define KARTO_DEBUG
 
   #define MAX_VARIANCE            500.0
   #define DISTANCE_PENALTY_GAIN   0.2
@@ -478,8 +478,6 @@ ScanMatcher * ScanMatcher::Create(
   Mapper * pMapper, kt_double searchSize, kt_double resolution,
   kt_double smearDeviation, kt_double rangeThreshold)
 {
-  // TODO: Baha Check Here
-
   // invalid parameters
   if (resolution <= 0) {
     return NULL;
@@ -578,8 +576,6 @@ kt_double ScanMatcher::MatchScan(
 
   ///////////////////////////////////////
 
-  //TODO: Baha LOOK HERE
-
   // set up correlation grid
 #ifdef KARTO_DEBUG
   std::cout << "scanPose.GetPosition() values " << scanPose.GetPosition() << std::endl;
@@ -670,7 +666,6 @@ kt_double ScanMatcher::MatchScan(
 
   return bestResponse;
 }
-//TODO the scanmatch algoritm running is here check it BAHA 
 void ScanMatcher::operator()(const kt_double & y) const
 {
   kt_int32u poseResponseCounter;
@@ -862,7 +857,6 @@ kt_double ScanMatcher::CorrelateScan(
       *ptr = math::Maximum(m_pPoseResponse[i].first, *ptr);
     }
   }
-  //TODO CHECK HERE
   // average all poses with same highest response
   Vector2<kt_double> averagePosition;
   kt_double thetaX = 0.0;
@@ -1695,35 +1689,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
         m_pMapper->FireEndLoopClosure("Loop closed!");
 
         loopClosed = true;
-        // TODO baha added here EKleme sebebim uzunca şudur:
-        // İlk önce robot loopclosure paramereleri ile matchscan atıyor bu değer 0.35 ve cov düşük ise while döngüsü içerisine giriyor.
-        // bu while döngüsü içerisinde bulunduğu konumu referans alaraktan tekrarda bir matchscan atıyor bu değer 0.45 den yüksk ise
-        // loopclosure yapıyor ve TRUE diyor. devamında ise tekrardan findpossibleloopclosure a giriyor şimdi burada ne oluyor peki
-        // tekrardan girince yeni chain ler buluyor ve bu yeni bulduğu chainlere göre tekrardan işleme tabi tutuyor burada referans atıyorum.
-        // terminal referansı:
-        //Checking of the candidatecChainsize inside of Loop CLosure: 7
-        // Doing MatchScan
-
-        // scanPose.GetPosition() values 0.605067 4.825724
-        // validPoints: (-3.218281, 4.160619)
-        // validPoints: (-inf, inf)
-        // validPoints: (-inf, inf)
-        // validPoints: (-1.570163, 3.980981)
-        // validPoints: (-inf, inf)
-        // validPoints: (-inf, inf)
-        // validPoints: (-inf, inf)
-        // kod fiinish
-
-        // burada ise tekrarda amtch arayınca buradaki verilere göre
-
-        // bestPose: -4.594933 0.625724 -0.244379
-        //  bestResponse: 0.250306
-        //  averagePose: -4.594933 0.625724 -0.244379
-        //  bestResponse: 0.250306
-        //  BEST POSE = -4.594933 0.625724 -0.244379 BEST RESPONSE = 0.250306,
-
-        // inanılmaz saçma bir depğer atıyor.. fakat zaten beim konumum doğruı ve 0.65 vemrişti ilk healtte niye tekrardan hesapolamaya giriyor
-        // byunu çözmek için direkt loopClosed değerini returnledim burada. ve bu değer true ise döngüden çıkıyor ve işlemi bitiriyor.
 #ifdef KARTO_DEBUG
     std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
 #endif

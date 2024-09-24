@@ -225,7 +225,7 @@ void SlamToolbox::setParams()
       position_search_do_relocalization_);
 
   position_search_minimum_best_response_ = 0.45;
-  position_search_minimum_best_response_ = this->declare_parameter("position_search_minimum_best_response",
+  position_search_minimum_best_response_ = this->declare_parameter("loop_match_minimum_response_fine",
       position_search_minimum_best_response_);
 }
 
