@@ -47,7 +47,7 @@ namespace karto
 {
 
 // enable this for verbose debug information
-// #define KARTO_DEBUG
+#define KARTO_DEBUG
 
   #define MAX_VARIANCE            500.0
   #define DISTANCE_PENALTY_GAIN   0.2
@@ -830,12 +830,17 @@ kt_double ScanMatcher::CorrelateScan(
   m_doPenalize = doPenalize;
   tbb::parallel_for_each(m_yPoses, (*this));
 
+  std::cout << "\n\n\nDOING PARALLEL FOR EACH\n\n\n" << std::endl;
   // find value of best response (in [0; 1])
   kt_double bestResponse = -1;
   
+  using namespace std::chrono;
+
+  std::chrono::time_point<std::chrono::steady_clock> start, end;  
+  start = std::chrono::steady_clock::now();
+
   for (kt_int32u i = 0; i < poseResponseSize; i++) {
     bestResponse = math::Maximum(bestResponse, m_pPoseResponse[i].first);    
-    // std::cout << "bestresponse " << m_pPoseResponse[i].first << "pose" << m_pPoseResponse[i].second.GetPosition() << "heading" << m_pPoseResponse[i].second.GetHeading() << std::endl; 
     // will compute positional covariance, save best relative probability for each cell
     if (!doingFineMatch) {
       const Pose2 & rPose = m_pPoseResponse[i].second;
@@ -857,6 +862,13 @@ kt_double ScanMatcher::CorrelateScan(
       *ptr = math::Maximum(m_pPoseResponse[i].first, *ptr);
     }
   }
+
+  end = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::cout << "-------finished for inside of correlatescan at\n"
+            << "-------elapsed time: " << elapsed_seconds.count() << "s\n";
+
+
   // average all poses with same highest response
   Vector2<kt_double> averagePosition;
   kt_double thetaX = 0.0;
@@ -1828,7 +1840,6 @@ void MapperGraph::LinkNearChains(
     * receive outputs greater than 0.5 from bestresponse, regardless of whether the robot's position is correct or not.
     */
     auto best_solution_info = std::make_shared<Mapper::LocalizationInfos>(); 
-
 
     best_solution_info->bestResponse = response;
     best_solution_info->bestPoseX = pScan->GetSensorPose().GetX();
