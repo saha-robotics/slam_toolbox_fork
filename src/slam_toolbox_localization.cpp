@@ -229,10 +229,6 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   return range_scan;
 }
 
-/*
- *TODO: I'll think about this later
- */
-
 void LocalizationSlamToolbox::setInitialParametersForDesiredPose(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
                           double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
                           double position_search_smear_deviation,bool do_loop_closing_flag){
@@ -266,7 +262,7 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
   }
 
   if (req->pose_x == 0.0 || req->pose_y == 0.0) {
-      RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided.");
+      RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided or cannot be equal to <0.0>");
       res->message = "Error: pose_x or pose_y is missing. Please use it";
       res->success = false;
       return false;
@@ -317,9 +313,7 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
           boost::mutex::scoped_lock lock(smapper_mutex_);
           range_scan->SetOdometricPose(*process_desired_pose_);
           range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
-          std::cout << "Starting ProcessAgainstNodesNearBy" << std::endl;
           processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
-          std::cout << "Finished ProcessAgainstNodesNearBy\n\n\n\n\n\n\n" << std::endl;
         
           if (processed) {
             std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
@@ -327,21 +321,13 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
             double best_pose_x = response->bestPoseX;
             double best_pose_y = response->bestPoseY;
 
-            std::cout << "best_response " << best_response << std::endl;
-            std::cout << "req->minimum_best_response " << position_search_minimum_best_response_ << std::endl;
             if (best_response > position_search_minimum_best_response_) {
-                std::cout<< "finded best response, processing localization." << std::endl;
 
                 if (position_search_do_relocalization_) {
-                  std::cout << "range_scan->GetCorrectedPose() before" << range_scan->GetCorrectedPose().GetX() << " " << range_scan->GetCorrectedPose().GetY() << " " << range_scan->GetCorrectedPose().GetHeading() << std::endl;
-                  std::cout << "range_scan->GetOdometricPose() before" << range_scan->GetOdometricPose().GetX() << " " << range_scan->GetOdometricPose().GetY() << " " << range_scan->GetOdometricPose().GetHeading() << std::endl;
                   setTransformFromPoses(range_scan->GetCorrectedPose(), last_odom_pose_stored_,
                     last_scan_stored_->header.stamp, true);
 
                   publishPose(range_scan->GetCorrectedPose(), covariance, last_scan_stored_->header.stamp);
-
-                  std::cout << "range_scan->GetCorrectedPose() after" << range_scan->GetCorrectedPose().GetX() << " " << range_scan->GetCorrectedPose().GetY() << " " << range_scan->GetCorrectedPose().GetHeading() << std::endl;
-                  std::cout << "range_scan->GetOdometricPose() after " << range_scan->GetOdometricPose().GetX() << " " << range_scan->GetOdometricPose().GetY() << " " << range_scan->GetOdometricPose().GetHeading() << std::endl;
                 }
                 else {
                   range_scan->SetOdometricPose(last_odom_pose_stored_);

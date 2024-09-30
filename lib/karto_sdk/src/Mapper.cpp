@@ -47,7 +47,7 @@ namespace karto
 {
 
 // enable this for verbose debug information
-#define KARTO_DEBUG
+// #define KARTO_DEBUG
 
   #define MAX_VARIANCE            500.0
   #define DISTANCE_PENALTY_GAIN   0.2
@@ -787,24 +787,6 @@ kt_double ScanMatcher::CorrelateScan(
   }
   assert(math::DoubleEqual(m_yPoses.back(), -startY));
 
-  // mx ve my poses  benim grid size ımdaki resamplelanmış pose ları tekabul ediyor 
-  // burayı şu anlık açmaya gerek yok yapığı şey belirlenen çözünürlük kadar rsearch center
-  // dan başlayarak + - tarafa kadar grid size kadar çözünürlükte yeni değer atamak ve bu değerleri
-  // scanmatch hesabına sokup best response bulmak.
-
-  // std::cout << "m_xPoses: ";
-  // for (const auto& x : m_xPoses) {
-  //     std::cout << x << " ";
-  // }
-  // std::cout << std::endl;
-
-  // std::cout << "m_yPoses: ";
-  // for (const auto& y : m_yPoses) {
-  //     std::cout << y << " ";
-  // }
-  // std::cout << std::endl;
-
-
   // calculate pose response array size
   kt_int32u nAngles =
     static_cast<kt_int32u>(math::Round(searchAngleOffset * 2.0 / searchAngleResolution) + 1);
@@ -830,15 +812,8 @@ kt_double ScanMatcher::CorrelateScan(
   m_doPenalize = doPenalize;
   tbb::parallel_for_each(m_yPoses, (*this));
 
-  std::cout << "\n\n\nDOING PARALLEL FOR EACH\n\n\n" << std::endl;
   // find value of best response (in [0; 1])
   kt_double bestResponse = -1;
-  
-  using namespace std::chrono;
-
-  std::chrono::time_point<std::chrono::steady_clock> start, end;  
-  start = std::chrono::steady_clock::now();
-
   for (kt_int32u i = 0; i < poseResponseSize; i++) {
     bestResponse = math::Maximum(bestResponse, m_pPoseResponse[i].first);    
     // will compute positional covariance, save best relative probability for each cell
@@ -863,19 +838,12 @@ kt_double ScanMatcher::CorrelateScan(
     }
   }
 
-  end = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed_seconds = end - start;
-  std::cout << "-------finished for inside of correlatescan at\n"
-            << "-------elapsed time: " << elapsed_seconds.count() << "s\n";
-
-
   // average all poses with same highest response
   Vector2<kt_double> averagePosition;
   kt_double thetaX = 0.0;
   kt_double thetaY = 0.0;
   kt_int32s averagePoseCount = 0;
   for (kt_int32u i = 0; i < poseResponseSize; i++) {
-    // std::cout<< "m_pPoseResponse[i].second.GetPosition();"<< m_pPoseResponse[i].second.GetPosition() << std::endl;
     if (math::DoubleEqual(m_pPoseResponse[i].first, bestResponse)) {
       averagePosition += m_pPoseResponse[i].second.GetPosition();
 
@@ -903,11 +871,6 @@ kt_double ScanMatcher::CorrelateScan(
   delete[] m_pPoseResponse;
   m_pPoseResponse = nullptr;
 
-#ifdef KARTO_DEBUG
-  std::cout << "bestPose: " << averagePose << std::endl;
-  std::cout << "bestResponse: " << bestResponse << std::endl;
-#endif
-
   if (!doingFineMatch) {
     ComputePositionalCovariance(averagePose, bestResponse, rSearchCenter, rSearchSpaceOffset,
       rSearchSpaceResolution, searchAngleResolution, rCovariance);
@@ -922,7 +885,6 @@ kt_double ScanMatcher::CorrelateScan(
   std::cout << "averagePose: " << averagePose << std::endl;
   std::cout << "bestResponse: " << bestResponse << std::endl;
 #endif
-
 
   if (bestResponse > 1.0) {
     bestResponse = 1.0;
@@ -1601,7 +1563,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 #endif
     Pose2 bestPose;
     Matrix3 covariance;
-    std::cout << "-----------------the next scan match is from trycloseloop------------" << std::endl;
     kt_double coarseResponse = m_pLoopScanMatcher->MatchScan(pScan, candidateChain,
         bestPose, covariance, false, false);
 
@@ -1704,8 +1665,6 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 #ifdef KARTO_DEBUG
     std::cout << std::boolalpha << "Output of Loop Closure: " << loopClosed << std::endl;
 #endif
-
-      // return loopClosed;   // default is false
       }
     }
     candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
@@ -2810,19 +2769,16 @@ void Mapper::setParamAngleVariancePenalty(double d)
 void Mapper::setParamFineSearchAngleOffset(double d)
 {
   m_pFineSearchAngleOffset->SetValue((kt_double)d);
-  std::cout << "m_pFineSearchAngleOffset: " << *m_pFineSearchAngleOffset << std::endl;
 }
 
 void Mapper::setParamCoarseSearchAngleOffset(double d)
 {
   m_pCoarseSearchAngleOffset->SetValue((kt_double)d);
-  std::cout << "m_pCoarseSearchAngleOffset: " << *m_pCoarseSearchAngleOffset << std::endl;
 }
 
 void Mapper::setParamCoarseAngleResolution(double d)
 {
   m_pCoarseAngleResolution->SetValue((kt_double)d);
-  std::cout << "m_pCoarseAngleResolution: " << *m_pCoarseAngleResolution << std::endl;
 }
 
 void Mapper::setParamMinimumAnglePenalty(double d)
@@ -3022,7 +2978,6 @@ kt_bool Mapper::ProcessAgainstNodesNearBy(LocalizedRangeScan * pScan, kt_bool ad
       return false;
     }
 
-    std::cout <<"m_Initialized: " << m_Initialized << std::endl;
     if (m_Initialized == false) {
       // initialize mapper with range threshold from device
       Initialize(pLaserRangeFinder->GetRangeThreshold());
@@ -3093,12 +3048,14 @@ kt_bool Mapper::ProcessAgainstNodesNearBy(LocalizedRangeScan * pScan, kt_bool ad
     }
 #ifdef KARTO_DEBUG
     // sebebi robotu bir konuma atadığımız zaman odometric pose corrected pose a göre updatelenmiyor 
-    // bu sebepten ötürü processlocalization içerisindeki kodda  otomatik olarak plastscan
-    // arası odometric ve corected pose akar güncel sensor pose unu initial x kadar öteliyor.
-    // bu da biz 2d pose ataması sonucu bulduğumuz sistemlerde otomatik olarka x kadar konum atlatıyor
+    // bu sebepten ötürü processlocalization içerisindeki kodda otomatik olarak plastscan
+    // arası odometric ve corected pose oranı kadar güncel sensor pose unu oran kadar öteliyor.
+    // bu da robotun odometric pose unu matchscan sonucunda bulduğu yere oturtmuyor.
     // docker kısmında bunu yapmış fakat ana kodun bir kısmında correctedpose ile odometric pose
     // arasında bir uyumsuzluk var. Kod burada execute edilip çıktıktan sonra direkt processlocalization
     // koduna girip zıplattığı için onun öncesinde burada eşitliyorum bu sayede hatadan kurtuluyoruz.
+    // Tam güvenilirliğin bilmediğim için scan buffer içerisindeki scan verilerini siliyorum mantıken yaptıgımız
+    // işlem burada doğru bir hataya rastlamadım.
     // üzerinde daha düşüneceğim.
     pScan->SetOdometricPose(pScan->GetCorrectedPose());
     std::cout <<"\n\n\n\n\n\n\nprocessagainsnotdeby trycloseloop has finished\n\n\n\n\n\n\n\n" << std::endl;
@@ -3424,14 +3381,12 @@ kt_bool Mapper::HasMovedEnough(LocalizedRangeScan * pScan, LocalizedRangeScan * 
 {
   // test if first scan
   if (pLastScan == NULL) {
-    std::cout << "First scan" << std::endl;
     return true;
   }
 
   // test if enough time has passed
   kt_double timeInterval = pScan->GetTime() - pLastScan->GetTime();
   if (timeInterval >= m_pMinimumTimeInterval->GetValue()) {
-    std::cout << "Time interval: " << timeInterval << std::endl;
     return true;
   }
 
@@ -3443,7 +3398,6 @@ kt_bool Mapper::HasMovedEnough(LocalizedRangeScan * pScan, LocalizedRangeScan * 
   kt_double deltaHeading = math::NormalizeAngle(
     scannerPose.GetHeading() - lastScannerPose.GetHeading());
   if (fabs(deltaHeading) >= m_pMinimumTravelHeading->GetValue()) {
-    std::cout << "Delta heading: " << deltaHeading << std::endl;
     return true;
   }
 
