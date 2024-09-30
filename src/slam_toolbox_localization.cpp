@@ -309,7 +309,6 @@ bool LocalizationSlamToolbox::desiredPoseCheck(
           process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, 0.0);
           range_scan = getLocalizedRangeScan(last_laser_stored_, last_scan_stored_, last_odom_pose_stored_);
 
-          // first_measurement_  = true;
           boost::mutex::scoped_lock lock(smapper_mutex_);
           range_scan->SetOdometricPose(*process_desired_pose_);
           range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
