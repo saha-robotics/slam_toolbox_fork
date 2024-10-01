@@ -106,6 +106,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   srvs/AddSubmap.srv
   srvs/DeserializePoseGraph.srv
   srvs/DesiredPoseChecker.srv
+  srvs/ElevatorMode.srv
   srvs/SerializePoseGraph.srv
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs nav_msgs visualization_msgs
 )
