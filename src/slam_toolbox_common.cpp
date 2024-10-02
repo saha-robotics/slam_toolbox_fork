@@ -192,6 +192,40 @@ void SlamToolbox::setParams()
   smapper_->configure(shared_from_this());
   this->declare_parameter("paused_new_measurements",rclcpp::ParameterType::PARAMETER_BOOL);
   this->set_parameter({"paused_new_measurements", false});
+
+  /*
+  * Those parameters for pose_search service
+  */
+  position_search_distance_ = 12.0;
+  position_search_distance_ = this->declare_parameter("position_search_distance",
+      position_search_distance_);
+  
+  position_search_resolution_ = 0.05;
+  position_search_resolution_ = this->declare_parameter("position_search_resolution",
+      position_search_resolution_);
+
+  position_search_smear_deviation_ = 0.03;
+  position_search_smear_deviation_ = this->declare_parameter("position_search_smear_deviation",
+      position_search_smear_deviation_);
+
+  position_search_fine_angle_offset_ = 0.00349;
+  position_search_fine_angle_offset_ = this->declare_parameter("position_search_fine_search_angle_offset",
+      position_search_fine_angle_offset_);
+
+  position_search_coarse_angle_offset_ = 3.14;
+  position_search_coarse_angle_offset_ = this->declare_parameter("position_search_coarse_angle_offset",
+      position_search_coarse_angle_offset_);
+
+  position_search_coarse_angle_resolution_ = 0.0349;
+  position_search_coarse_angle_resolution_ = this->declare_parameter("position_search_coarse_angle_resolution",
+      position_search_coarse_angle_resolution_);
+
+  position_search_do_relocalization_ = false;
+  position_search_do_relocalization_ = this->declare_parameter("position_search_do_relocalization",
+      position_search_do_relocalization_);
+
+  position_search_minimum_best_response_ = 0.45;
+  this->get_parameter("loop_match_minimum_response_fine", position_search_minimum_best_response_);
 }
 
 /*****************************************************************************/
@@ -199,6 +233,8 @@ void SlamToolbox::setROSInterfaces()
 /*****************************************************************************/
 {
   double tmp_val = 30.;
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+
   tmp_val = this->declare_parameter("tf_buffer_duration", tmp_val);
   tf_ = std::make_unique<tf2_ros::Buffer>(this->get_clock(),
       tf2::durationFromSec(tmp_val));
@@ -212,7 +248,7 @@ void SlamToolbox::setROSInterfaces()
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
   localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-    "slam_toolbox/best_response", 10);
+    "slam_toolbox/best_response", qos);
 
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
@@ -263,16 +299,20 @@ void SlamToolbox::publishTransformLoop(
       rclcpp::Time scan_timestamp = scan_header.stamp;
 
       //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
-      double * best_response =smapper_->getMapper()->GetBestResponse();
+      std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
+
+      double best_response = response->bestResponse;
+      double best_pose_x = response->bestPoseX;
+      double best_pose_y = response->bestPoseY;
       static double previous_best_response = 0.0;  
 
-      if (best_response != nullptr && *best_response > 0.02) {
+      if (best_response > 0.02) {
           try {
-            if (*best_response != previous_best_response) {
+            if (best_response != previous_best_response) {
                 std_msgs::msg::Float32 msg;
-                msg.data = static_cast<float>(*best_response);  // TODO: Change here
+                msg.data = static_cast<float>(best_response);  
                 localization_health_pub_->publish(msg);
-                previous_best_response = *best_response;  
+                previous_best_response = best_response;  
             }
           } 
           catch (std::exception & e) {
@@ -280,7 +320,6 @@ void SlamToolbox::publishTransformLoop(
             RCLCPP_ERROR(this->get_logger(), "Exception caught while dereferencing best_response: %s", e.what());
           }
       } 
-      //      
 
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
