@@ -1970,11 +1970,13 @@ public:
       double bestResponse;
       double bestPoseX;
       double bestPoseY;
+      int nearChainsCount;
   };
 
   std::shared_ptr<double> m_pbestResponse;
   std::shared_ptr<double> m_pbestPoseX;
   std::shared_ptr<double> m_pbestPoseY;
+  std::shared_ptr<int> m_pnearChainsCount;
 
   std::shared_ptr<LocalizationInfos> GetBestResponse() const;
   void SetBestResponse(const std::shared_ptr<LocalizationInfos>& response);

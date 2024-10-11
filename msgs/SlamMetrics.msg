@@ -1,0 +1,3 @@
+std_msgs/Header header
+float64 best_response
+uint16 near_node_count

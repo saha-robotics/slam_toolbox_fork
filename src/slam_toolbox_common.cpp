@@ -247,8 +247,8 @@ void SlamToolbox::setROSInterfaces()
 
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
-  localization_health_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-    "slam_toolbox/best_response", qos);
+  localization_health_pub_ = this->create_publisher<slam_toolbox::msg::SlamMetrics>(
+    "slam_toolbox/slam_metrics", qos);
 
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
@@ -304,15 +304,18 @@ void SlamToolbox::publishTransformLoop(
       double best_response = response->bestResponse;
       double best_pose_x = response->bestPoseX;
       double best_pose_y = response->bestPoseY;
+      int near_chain_count = response->nearChainsCount;
       static double previous_best_response = 0.0;  
 
       if (best_response > 0.02) {
           try {
             if (best_response != previous_best_response) {
-                std_msgs::msg::Float32 msg;
-                msg.data = static_cast<float>(best_response);  
+                slam_toolbox::msg::SlamMetrics msg;
+                msg.header.stamp = this->now();
+                msg.best_response = best_response;
+                msg.near_node_count = near_chain_count;
                 localization_health_pub_->publish(msg);
-                previous_best_response = best_response;  
+                previous_best_response = best_response; 
             }
           } 
           catch (std::exception & e) {
