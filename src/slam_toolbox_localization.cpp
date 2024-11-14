@@ -39,6 +39,10 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::bind(&LocalizationSlamToolbox::clearLocalizationBuffer, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  set_parameters_srv_ = this->create_service<slam_toolbox::srv::SetParametersService>(
+    "slam_toolbox/set_dynamic_parameters",
+    std::bind(&LocalizationSlamToolbox::set_parameters_callback, this, std::placeholders::_1, std::placeholders::_2));
+
   // in localization mode, we cannot allow for interactive mode
   enable_interactive_mode_ = false;
 
@@ -204,6 +208,44 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
 
   return range_scan;
 }
+
+void LocalizationSlamToolbox::set_parameters_callback(
+    const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
+    std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response
+) 
+{
+    if (request->param_names.size() != request->param_values.size()) {
+        response->success = false;
+        response->message = "Mismatched param_names and param_values lengths.";
+        return;
+    }
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    std::cout << "Setting parameters for the specified mode" << std::endl;
+    for (size_t i = 0; i < request->param_names.size(); ++i) {
+        const auto &param_name = request->param_names[i];
+        const auto &param_value = request->param_values[i];
+
+        if (param_name == "loop_search_maximum_distance")
+        {
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
+        } 
+        else if (param_name == "loop_search_space_dimension") 
+        {
+            smapper_->getMapper()->setParamLoopSearchSpaceDimension(param_value);
+        } 
+        else {
+            std::cerr << "Unknown parameter: " << param_name << std::endl;
+        }
+    }
+
+    smapper_->getMapper()->m_Initialized = false;
+
+    // Başarı durumunu ve mesajı ayarla
+    response->success = true;
+    response->message = "Parameters set successfully for the specified mode";
+    std::cout <<"Parameters set successfully for the specified mode" << std::endl;
+}
+
 
 /*****************************************************************************/
 void LocalizationSlamToolbox::localizePoseCallback(

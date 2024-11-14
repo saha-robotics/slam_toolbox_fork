@@ -47,7 +47,7 @@ namespace karto
 {
 
 // enable this for verbose debug information
-// #define KARTO_DEBUG
+#define KARTO_DEBUG
 
   #define MAX_VARIANCE            500.0
   #define DISTANCE_PENALTY_GAIN   0.2
@@ -2127,6 +2127,12 @@ void MapperGraph::UpdateLoopScanMatcher(kt_double rangeThreshold)
   if (m_pLoopScanMatcher) {
     delete m_pLoopScanMatcher;
   }
+#ifdef KARTO_DEBUG
+  std::cout << "\n\n\n UpdateLoopScanMatcher function is called\n\n\n" << std::endl;
+  std::cout << "m_pMapper->m_pLoopSearchSpaceDimension->GetValue() " << m_pMapper->m_pLoopSearchSpaceDimension->GetValue() << std::endl;
+  std::cout << "m_pMapper->m_pLoopSearchSpaceResolution->GetValue() " << m_pMapper->m_pLoopSearchSpaceResolution->GetValue() << std::endl;
+  std::cout << "m_pMapper->m_pLoopSearchSpaceSmearDeviation->GetValue() " << m_pMapper->m_pLoopSearchSpaceSmearDeviation->GetValue() << std::endl;
+#endif
   m_pLoopScanMatcher = ScanMatcher::Create(m_pMapper,
     m_pMapper->m_pLoopSearchSpaceDimension->GetValue(),
     m_pMapper->m_pLoopSearchSpaceResolution->GetValue(),
@@ -2701,7 +2707,12 @@ void Mapper::Initialize(kt_double rangeThreshold)
     return;
   }
   // create sequential scan and loop matcher, update if deserialized
-
+#ifdef KARTO_DEBUG
+  std::cout << "\n\n\n\nInitialize function is called\n\n\n" << std::endl;
+  std::cout << "m_pCorrelationSearchSpaceDimension: " << *m_pCorrelationSearchSpaceDimension << std::endl;
+  std::cout << "m_pCorrelationSearchSpaceResolution: " << *m_pCorrelationSearchSpaceResolution << std::endl;
+  std::cout << "m_pCorrelationSearchSpaceSmearDeviation: " << *m_pCorrelationSearchSpaceSmearDeviation << std::endl;
+#endif
   if (m_pSequentialScanMatcher) {
     delete m_pSequentialScanMatcher;
   }

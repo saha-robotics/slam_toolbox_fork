@@ -106,6 +106,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   srvs/AddSubmap.srv
   srvs/DeserializePoseGraph.srv
   srvs/SerializePoseGraph.srv
+  srvs/ModeSelection.srv
+  srvs/SetParametersService.srv
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs nav_msgs visualization_msgs
 )
 

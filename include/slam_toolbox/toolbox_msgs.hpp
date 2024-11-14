@@ -39,5 +39,7 @@
 #include "slam_toolbox/srv/deserialize_pose_graph.hpp"
 #include "slam_toolbox/srv/merge_maps.hpp"
 #include "slam_toolbox/srv/add_submap.hpp"
+#include "slam_toolbox/srv/set_parameters_service.hpp"
+#include "slam_toolbox/srv/mode_selection.hpp"
 
 #endif  // SLAM_TOOLBOX__TOOLBOX_MSGS_HPP_

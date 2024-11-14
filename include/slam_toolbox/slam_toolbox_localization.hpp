@@ -42,6 +42,9 @@ protected:
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     std::shared_ptr<std_srvs::srv::Empty::Response> resp);
+  void set_parameters_callback(
+    const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
+    std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response);
 
   virtual bool serializePoseGraphCallback(
     const std::shared_ptr<rmw_request_id_t> request_header,
@@ -60,6 +63,7 @@ protected:
   std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
   localization_pose_sub_;
   std::shared_ptr<rclcpp::Service<std_srvs::srv::Empty> > clear_localization_;
+  std::shared_ptr<rclcpp::Service<slam_toolbox::srv::SetParametersService> > set_parameters_srv_;
 };
 
 }  // namespace slam_toolbox
