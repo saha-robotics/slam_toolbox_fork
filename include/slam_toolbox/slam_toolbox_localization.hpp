@@ -60,6 +60,12 @@ protected:
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
     Pose2 & pose) override;
 
+  void setInitialParameters(
+    double position_search_distance, double position_search_maximum_distance,
+    double position_search_fine_angle_offset, double position_search_coarse_angle_offset,
+    double position_search_coarse_angle_resolution, double position_search_resolution, 
+    double position_search_smear_deviation, bool do_loop_closing_flag);
+
   std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
   localization_pose_sub_;
   std::shared_ptr<rclcpp::Service<std_srvs::srv::Empty> > clear_localization_;

@@ -209,28 +209,63 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   return range_scan;
 }
 
+void LocalizationSlamToolbox::setInitialParameters(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
+                          double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
+                          double position_search_smear_deviation,bool do_loop_closing_flag){
+
+  smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance);
+  smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_maximum_distance);
+  smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset);
+  smapper_->getMapper()->setParamCoarseSearchAngleOffset(position_search_coarse_angle_offset);
+  smapper_->getMapper()->setParamCoarseAngleResolution(position_search_coarse_angle_resolution);
+  smapper_->getMapper()->setParamLoopSearchSpaceResolution(position_search_resolution);
+  smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(position_search_smear_deviation);
+  smapper_->getMapper()->setParamDoLoopClosing(do_loop_closing_flag);
+  smapper_->getMapper()->m_Initialized = false;
+
+}
+
 void LocalizationSlamToolbox::set_parameters_callback(
     const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
     std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response
 ) 
 {
+    if (request->default_mode) {
+        RCLCPP_INFO(get_logger(), "Setting parameters for the default mode");
+        boost::mutex::scoped_lock lock(smapper_mutex_);
+        setInitialParameters(
+            this->get_parameter("loop_search_space_dimension").as_double(),
+            this->get_parameter("loop_search_maximum_distance").as_double(), 
+            this->get_parameter("fine_search_angle_offset").as_double(),
+            this->get_parameter("coarse_search_angle_offset").as_double(),
+            this->get_parameter("coarse_angle_resolution").as_double(),
+            this->get_parameter("loop_search_space_resolution").as_double(),
+            this->get_parameter("loop_search_space_smear_deviation").as_double(),
+            this->get_parameter("do_loop_closing").as_bool()
+        );
+
+        response->success = true;
+        response->message = "Default parameters set successfully.";
+        return;
+    } 
+
     if (request->param_names.size() != request->param_values.size()) {
         response->success = false;
         response->message = "Mismatched param_names and param_values lengths.";
         return;
     }
+
     boost::mutex::scoped_lock lock(smapper_mutex_);
     std::cout << "Setting parameters for the specified mode" << std::endl;
+
     for (size_t i = 0; i < request->param_names.size(); ++i) {
         const auto &param_name = request->param_names[i];
         const auto &param_value = request->param_values[i];
 
-        if (param_name == "loop_search_maximum_distance")
-        {
+        if (param_name == "loop_search_maximum_distance") {
             smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
         } 
-        else if (param_name == "loop_search_space_dimension") 
-        {
+        else if (param_name == "loop_search_space_dimension") {
             smapper_->getMapper()->setParamLoopSearchSpaceDimension(param_value);
         } 
         else {
@@ -238,13 +273,13 @@ void LocalizationSlamToolbox::set_parameters_callback(
         }
     }
 
+    // Parametrelerin başarıyla ayarlandığını bildirin
     smapper_->getMapper()->m_Initialized = false;
-
-    // Başarı durumunu ve mesajı ayarla
     response->success = true;
     response->message = "Parameters set successfully for the specified mode";
-    std::cout <<"Parameters set successfully for the specified mode" << std::endl;
+    std::cout << "Parameters set successfully for the specified mode" << std::endl;
 }
+
 
 
 /*****************************************************************************/
