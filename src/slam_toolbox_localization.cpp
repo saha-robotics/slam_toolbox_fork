@@ -221,8 +221,12 @@ void LocalizationSlamToolbox::setInitialParameters(double position_search_distan
   smapper_->getMapper()->setParamLoopSearchSpaceResolution(position_search_resolution);
   smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(position_search_smear_deviation);
   smapper_->getMapper()->setParamDoLoopClosing(do_loop_closing_flag);
-  smapper_->getMapper()->m_Initialized = false;
-
+  if(processor_type_ == PROCESS_LOCALIZATION){
+    smapper_->getMapper()->m_Initialized = false;
+  }
+  else{
+    smapper_->getMapper()->GetGraph()->UpdateLoopScanMatcher(this->get_parameter("max_laser_range").as_double());
+  }
 }
 
 void LocalizationSlamToolbox::set_parameters_callback(
@@ -273,8 +277,12 @@ void LocalizationSlamToolbox::set_parameters_callback(
         }
     }
 
-    // Parametrelerin başarıyla ayarlandığını bildirin
-    smapper_->getMapper()->m_Initialized = false;
+    if(processor_type_ == PROCESS_LOCALIZATION){
+      smapper_->getMapper()->m_Initialized = false;
+    }
+    else{
+      smapper_->getMapper()->GetGraph()->UpdateLoopScanMatcher(this->get_parameter("max_laser_range").as_double());
+    }
     response->success = true;
     response->message = "Parameters set successfully for the specified mode";
     std::cout << "Parameters set successfully for the specified mode" << std::endl;
