@@ -46,10 +46,6 @@ protected:
     const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
     std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response);
 
-  bool desiredPoseCheck(
-    const std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Request> req,
-    std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Response> res); 
-
   virtual bool serializePoseGraphCallback(
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<slam_toolbox::srv::SerializePoseGraph::Request> req,
@@ -63,7 +59,6 @@ protected:
     LaserRangeFinder * laser,
     const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan,
     Pose2 & pose) override;
-
 
   void setInitialParameters(
     double position_search_distance, double position_search_maximum_distance,
