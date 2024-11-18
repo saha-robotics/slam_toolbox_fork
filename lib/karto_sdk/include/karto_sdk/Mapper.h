@@ -1963,11 +1963,22 @@ public:
 public:
 
   /** 
-   * Purpose of this function is set the best response to localization health information
+   * Purpose of this function is set the bestResponse, response and pose values to localization health information
    */
-  double * m_pbestResponse;
-  double * GetBestResponse();
-  void  SetBestResponse(double * pBestResponse);
+  struct LocalizationInfos
+  {
+      double bestResponse;
+      double bestPoseX;
+      double bestPoseY;
+  };
+
+  std::shared_ptr<double> m_pbestResponse;
+  std::shared_ptr<double> m_pbestPoseX;
+  std::shared_ptr<double> m_pbestPoseY;
+
+  std::shared_ptr<LocalizationInfos> GetBestResponse() const;
+  void SetBestResponse(const std::shared_ptr<LocalizationInfos>& response);
+
 
   /**
    * Allocate memory needed for mapping
@@ -2165,8 +2176,8 @@ private:
 public:
   void SetUseScanMatching(kt_bool val) {m_pUseScanMatching->SetValue(val);}
   kt_bool m_Initialized;
-
 protected:  
+
   kt_bool m_Deserialized;
 
   ScanMatcher * m_pSequentialScanMatcher;
