@@ -225,7 +225,8 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
 
 void LocalizationSlamToolbox::setInitialParameters(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
                           double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
-                          double position_search_smear_deviation,bool do_loop_closing_flag){
+                          double position_search_smear_deviation,bool do_loop_closing_flag,
+                          int scan_buffer_size){
 
   smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance);
   smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_maximum_distance);
@@ -235,6 +236,7 @@ void LocalizationSlamToolbox::setInitialParameters(double position_search_distan
   smapper_->getMapper()->setParamLoopSearchSpaceResolution(position_search_resolution);
   smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(position_search_smear_deviation);
   smapper_->getMapper()->setParamDoLoopClosing(do_loop_closing_flag);
+  smapper_->getMapper()->setParamScanBufferSize(scan_buffer_size);
   if(processor_type_ == PROCESS_LOCALIZATION){
     smapper_->getMapper()->m_Initialized = false;
   }
@@ -259,7 +261,8 @@ void LocalizationSlamToolbox::set_parameters_callback(
             this->get_parameter("coarse_angle_resolution").as_double(),
             this->get_parameter("loop_search_space_resolution").as_double(),
             this->get_parameter("loop_search_space_smear_deviation").as_double(),
-            this->get_parameter("do_loop_closing").as_bool()
+            this->get_parameter("do_loop_closing").as_bool(),
+            this->get_parameter("scan_buffer_size").as_int()
         );
 
         response->success = true;
@@ -274,6 +277,18 @@ void LocalizationSlamToolbox::set_parameters_callback(
     }
 
     boost::mutex::scoped_lock lock(smapper_mutex_);
+    // main purpose is resetting all the parameters first call. then initialize.
+    setInitialParameters(
+        this->get_parameter("loop_search_space_dimension").as_double(),
+        this->get_parameter("loop_search_maximum_distance").as_double(), 
+        this->get_parameter("fine_search_angle_offset").as_double(),
+        this->get_parameter("coarse_search_angle_offset").as_double(),
+        this->get_parameter("coarse_angle_resolution").as_double(),
+        this->get_parameter("loop_search_space_resolution").as_double(),
+        this->get_parameter("loop_search_space_smear_deviation").as_double(),
+        this->get_parameter("do_loop_closing").as_bool(),
+        this->get_parameter("scan_buffer_size").as_int()
+    );
 
     for (size_t i = 0; i < request->param_names.size(); ++i) {
         const auto &param_name = request->param_names[i];
@@ -285,6 +300,22 @@ void LocalizationSlamToolbox::set_parameters_callback(
         else if (param_name == "loop_search_space_dimension") {
             smapper_->getMapper()->setParamLoopSearchSpaceDimension(param_value);
         } 
+        else if (param_name == "loop_search_space_resolution"){
+            smapper_->getMapper()->setParamLoopSearchSpaceResolution(param_value);
+        }
+        else if (param_name == "loop_search_space_smear_deviation"){
+            smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(param_value);
+        }
+        else if (param_name == "loop_search_maximum_distance"){
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
+        }
+        else if (param_name == "correlation_search_space_dimension"){
+            smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(param_value);
+        }
+        else if (param_name == "scan_buffer_size"){
+            int value =static_cast<int>(param_value);
+            smapper_->getMapper()->setParamScanBufferSize(value);        
+        }
         else {
             RCLCPP_ERROR(get_logger(),
               "Parameter not recognized. Returning false");
