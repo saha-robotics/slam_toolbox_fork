@@ -1659,6 +1659,12 @@ public:
   void AddScan(LocalizedRangeScan * pScan);
 
   /**
+   * Add table which is founded position of scan 
+   * @param pScan
+   */
+  void AddTable(LocalizedRangeScan * pScan); 
+
+  /**
    * Adds scan to running scans of device that recorded scan
    * @param pScan
    */
@@ -1979,6 +1985,29 @@ public:
   std::shared_ptr<LocalizationInfos> GetBestResponse() const;
   void SetBestResponse(const std::shared_ptr<LocalizationInfos>& response);
 
+  std::vector<LocalizedRangeScan*> pScanVector;
+  kt_bool saveTableData_;
+
+  void StartTableStorage(kt_bool saveTableData);
+
+  void StoreAddress(LocalizedRangeScan* pScan) {
+      pScanVector.push_back(pScan);
+      std::cout << "Stored pScan at address: " << static_cast<void*>(pScan)
+                << " at index: " << pScanVector.size() - 1 << std::endl;
+  }
+
+  void AccessByIndex(size_t index) {
+      if (index < pScanVector.size()) {
+          LocalizedRangeScan* pScan = pScanVector[index];
+          std::cout << "Accessing pScan at address: " << static_cast<void*>(pScan)
+                    << " with pose: "
+                    << pScan->GetOdometricPose().GetX() << " "
+                    << pScan->GetOdometricPose().GetY() << " "
+                    << pScan->GetOdometricPose().GetHeading() << std::endl;
+      } else {
+          std::cout << "Index out of bounds!" << std::endl;
+      }
+  }
 
   /**
    * Allocate memory needed for mapping

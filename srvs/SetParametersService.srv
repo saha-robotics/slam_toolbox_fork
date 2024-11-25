@@ -1,7 +1,7 @@
 string[] param_names
 float64[] param_values
 bool default_mode
-
+bool table_save_mode
 ---
 
 bool success

@@ -1111,6 +1111,28 @@ void ScanMatcher::AddScan(
 {
   PointVectorDouble validPoints = FindValidPoints(pScan, rViewPoint);
 
+#ifdef KARTO_DEBUG
+  if (!validPoints.empty()) {
+    std::cout <<"validPoints is representing added points from chain" << std::endl;
+    std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
+              << validPoints.begin()->GetY() << ")" << std::endl;
+  } else {
+    std::cout << "validPoints is empty!" << std::endl;
+  }
+#endif
+
+  if (!validPoints.empty()) {
+    std::cout << "validPoints is representing added points from chain" << std::endl;
+
+    // Print the first valid point's coordinates and address
+    std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
+              << validPoints.begin()->GetY() << ") at address: " << &(*validPoints.begin()) << std::endl;
+
+
+  } else {
+    std::cout << "validPoints is empty!" << std::endl;
+  }
+
   // put in all valid points
   const_forEach(PointVectorDouble, &validPoints)
   {
@@ -2188,13 +2210,25 @@ void MapperGraph::CorrectPoses()
 #endif
     const_forEach(ScanSolver::IdPoseVector, &pSolver->GetCorrections())
     {
+      std::cout << "Processing correction for ID: " << iter->first << std::endl;
       LocalizedRangeScan * scan = m_pMapper->m_pMapperSensorManager->GetScan(iter->first);
       if (scan == NULL) {
         continue;
       }
-      scan->SetCorrectedPoseAndUpdate(iter->second);
-    }
+      // Print the corrected pose (iter->second)
+      std::cout << "Corrected Pose: X=" << iter->second.GetX()
+                << " Y=" << iter->second.GetY()
+                << " Heading=" << iter->second.GetHeading() << std::endl;
 
+      scan->SetCorrectedPoseAndUpdate(iter->second);
+    
+      std::cout << "Updated Scan Pose: X=" << scan->GetCorrectedPose().GetX()
+                << " Y=" << scan->GetCorrectedPose().GetY()
+                << " Heading=" << scan->GetCorrectedPose().GetHeading() << std::endl;
+      std::cout << "Scan object address: " << scan << std::endl;
+      std::cout << "Corrected Pose Address: " << &iter->second << std::endl;
+
+    }
     pSolver->Clear();
   }
 }
@@ -2923,6 +2957,18 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
 
     // add scan to buffer and assign id
     m_pMapperSensorManager->AddScan(pScan);
+    // size_t index = std::distance(deviceNames.begin(), iter);
+    // std::cout << "Index of current element: " << index << std::endl;
+    if (saveTableData_ == true) {
+      StoreAddress(pScan);
+      for( auto i = 0; i < 10; i++ ) {
+        AccessByIndex(i);
+      }
+      CorrectPoses();
+    }
+    
+    // m_pMapperTableManager->AddTable(pScan);
+    // AccessByIndex(pScan);
 
     if (m_pUseScanMatching->GetValue()) {
       // add to graph
@@ -2934,6 +2980,8 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
 
       if (m_pDoLoopClosing->GetValue()) {
         std::vector<Name> deviceNames = m_pMapperSensorManager->GetSensorNames();
+        size_t index = deviceNames.size();
+
         const_forEach(std::vector<Name>, &deviceNames)
         {
           m_pGraph->TryCloseLoop(pScan, *iter);
@@ -2942,6 +2990,7 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     }
 
     m_pMapperSensorManager->SetLastScan(pScan);
+    std::cout <<"\n\nAddedScan is PRocess "<< pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() << " " << pScan->GetOdometricPose().GetHeading() << std::endl;
 
     return true;
   }
@@ -3145,7 +3194,8 @@ kt_bool Mapper::ProcessLocalization(LocalizedRangeScan * pScan, Matrix3 * covari
 
   m_pMapperSensorManager->SetLastScan(pScan);
   AddScanToLocalizationBuffer(pScan, scan_vertex);
-
+  std::cout <<"\n\nAddedScan is "<< pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() << " " << pScan->GetOdometricPose().GetHeading() << std::endl;
+  // AddScanPoseToTableData(pScan);
   return true;
 }
 
@@ -3514,6 +3564,11 @@ void Mapper::SetBestResponse(const std::shared_ptr<Mapper::LocalizationInfos>& r
             throw std::runtime_error("Mapper FATAL ERROR - One or more bestResponse pointers are null.");
         }
     }
+}
+
+void Mapper::StartTableStorage(kt_bool saveTableData)
+{
+  saveTableData_ = saveTableData;
 }
 
 void Mapper::SetScanSolver(ScanSolver * pScanOptimizer)

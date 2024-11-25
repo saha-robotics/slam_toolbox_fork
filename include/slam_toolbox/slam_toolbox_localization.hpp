@@ -67,6 +67,8 @@ protected:
     double position_search_smear_deviation, bool do_loop_closing_flag,
     int scan_buffer_size);
 
+  void triggerTableSave();
+
   std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
   localization_pose_sub_;
 

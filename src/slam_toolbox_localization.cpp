@@ -41,8 +41,8 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
 
   set_parameters_srv_ = this->create_service<slam_toolbox::srv::SetParametersService>(
     "slam_toolbox/set_dynamic_parameters",
-    std::bind(&LocalizationSlamToolbox::set_parameters_callback, this, std::placeholders::_1, std::placeholders::_2));
-
+    std::bind(&LocalizationSlamToolbox::set_parameters_callback, this,
+    std::placeholders::_1, std::placeholders::_2));
 
   // in localization mode, we cannot allow for interactive mode
   enable_interactive_mode_ = false;
@@ -222,7 +222,6 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   return range_scan;
 }
 
-
 void LocalizationSlamToolbox::setInitialParameters(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
                           double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
                           double position_search_smear_deviation,bool do_loop_closing_flag,
@@ -245,11 +244,25 @@ void LocalizationSlamToolbox::setInitialParameters(double position_search_distan
   }
 }
 
+void LocalizationSlamToolbox::triggerTableSave(){
+  if (processor_type_ == PROCESS){
+    RCLCPP_INFO(get_logger(), "Triggering table save function");
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    smapper_->getMapper()->StartTableStorage(true);
+
+  }
+}
+
 void LocalizationSlamToolbox::set_parameters_callback(
     const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
     std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response
 ) 
 {
+    if(request->table_save_mode){
+      triggerTableSave();
+      RCLCPP_INFO(get_logger(), "Triggering table save service");
+    }
+
     if (request->default_mode) {
         RCLCPP_INFO(get_logger(), "Setting parameters for the default mode");
         boost::mutex::scoped_lock lock(smapper_mutex_);
@@ -331,8 +344,6 @@ void LocalizationSlamToolbox::set_parameters_callback(
     response->success = true;
     response->message = "Parameters set successfully for the specified mode";
 }
-
-
 
 /*****************************************************************************/
 void LocalizationSlamToolbox::localizePoseCallback(
