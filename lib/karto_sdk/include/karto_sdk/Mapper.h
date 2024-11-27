@@ -1985,30 +1985,31 @@ public:
   std::shared_ptr<LocalizationInfos> GetBestResponse() const;
   void SetBestResponse(const std::shared_ptr<LocalizationInfos>& response);
 
-  std::vector<LocalizedRangeScan*> pScanVector;
+  /** 
+   * its for saving the desired pose of the robot
+   */
+  struct TablePose {
+      double x;
+      double y;
+      double yaw;
+      kt_int32u scanId;
+  };
+  enum class ProcessStatus {
+      Success,         
+      TableSaved,      
+      Failed           
+  };
+
+  std::vector<TablePose> poseVector;
   kt_bool saveTableData_;
 
   void StartTableStorage(kt_bool saveTableData);
+  void StorePose(const LocalizedRangeScan* pScan);
+  void UpdateStoredPoses();
+  bool tableSaveComplete_ = false;
 
-  void StoreAddress(LocalizedRangeScan* pScan) {
-      pScanVector.push_back(pScan);
-      std::cout << "Stored pScan at address: " << static_cast<void*>(pScan)
-                << " at index: " << pScanVector.size() - 1 << std::endl;
-  }
-
-  void AccessByIndex(size_t index) {
-      if (index < pScanVector.size()) {
-          LocalizedRangeScan* pScan = pScanVector[index];
-          std::cout << "Accessing pScan at address: " << static_cast<void*>(pScan)
-                    << " with pose: "
-                    << pScan->GetOdometricPose().GetX() << " "
-                    << pScan->GetOdometricPose().GetY() << " "
-                    << pScan->GetOdometricPose().GetHeading() << std::endl;
-      } else {
-          std::cout << "Index out of bounds!" << std::endl;
-      }
-  }
-
+  // void updatedTableData(LocalizedRangeScan* pScan);
+  
   /**
    * Allocate memory needed for mapping
    * @param rangeThreshold

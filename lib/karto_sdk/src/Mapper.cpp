@@ -1121,17 +1121,17 @@ void ScanMatcher::AddScan(
   }
 #endif
 
-  if (!validPoints.empty()) {
-    std::cout << "validPoints is representing added points from chain" << std::endl;
+  // if (!validPoints.empty()) {
+  //   std::cout << "validPoints is representing added points from chain" << std::endl;
 
-    // Print the first valid point's coordinates and address
-    std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
-              << validPoints.begin()->GetY() << ") at address: " << &(*validPoints.begin()) << std::endl;
+  //   // Print the first valid point's coordinates and address
+  //   std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
+  //             << validPoints.begin()->GetY() << ") at address: " << &(*validPoints.begin()) << std::endl;
 
 
-  } else {
-    std::cout << "validPoints is empty!" << std::endl;
-  }
+  // } else {
+  //   std::cout << "validPoints is empty!" << std::endl;
+  // }
 
   // put in all valid points
   const_forEach(PointVectorDouble, &validPoints)
@@ -2210,7 +2210,7 @@ void MapperGraph::CorrectPoses()
 #endif
     const_forEach(ScanSolver::IdPoseVector, &pSolver->GetCorrections())
     {
-      std::cout << "Processing correction for ID: " << iter->first << std::endl;
+      std::cout << "\n\nProcessing correction for ID: " << iter->first << std::endl;
       LocalizedRangeScan * scan = m_pMapper->m_pMapperSensorManager->GetScan(iter->first);
       if (scan == NULL) {
         continue;
@@ -2226,11 +2226,13 @@ void MapperGraph::CorrectPoses()
                 << " Y=" << scan->GetCorrectedPose().GetY()
                 << " Heading=" << scan->GetCorrectedPose().GetHeading() << std::endl;
       std::cout << "Scan object address: " << scan << std::endl;
-      std::cout << "Corrected Pose Address: " << &iter->second << std::endl;
+      std::cout << "Corrected Pose Address: " << &iter->second << "\n\n" << std::endl;
 
     }
     pSolver->Clear();
   }
+  m_pMapper->UpdateStoredPoses();
+
 }
 
 void MapperGraph::UpdateLoopScanMatcher(kt_double rangeThreshold)
@@ -2924,7 +2926,7 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     }
 
     // test if scan is outside minimum boundary or if heading is larger then minimum heading
-    if (!HasMovedEnough(pScan, pLastScan)) {
+    if (!HasMovedEnough(pScan, pLastScan) && !saveTableData_) {
       return false;
     }
 
@@ -2957,14 +2959,14 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
 
     // add scan to buffer and assign id
     m_pMapperSensorManager->AddScan(pScan);
-    // size_t index = std::distance(deviceNames.begin(), iter);
-    // std::cout << "Index of current element: " << index << std::endl;
+
     if (saveTableData_ == true) {
-      StoreAddress(pScan);
-      for( auto i = 0; i < 10; i++ ) {
-        AccessByIndex(i);
-      }
-      CorrectPoses();
+      
+      StorePose(pScan);
+      std::cout << "POse of the scan: " << pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() <<
+                                    " " << pScan->GetOdometricPose().GetHeading() << std::endl;
+
+      saveTableData_ = false;
     }
     
     // m_pMapperTableManager->AddTable(pScan);
@@ -3563,6 +3565,41 @@ void Mapper::SetBestResponse(const std::shared_ptr<Mapper::LocalizationInfos>& r
         } else {
             throw std::runtime_error("Mapper FATAL ERROR - One or more bestResponse pointers are null.");
         }
+    }
+}
+
+void Mapper::StorePose(const LocalizedRangeScan * pScan)
+{
+    TablePose pose; 
+    pose.x = pScan->GetOdometricPose().GetX();
+    pose.y = pScan->GetOdometricPose().GetY();
+    pose.yaw = pScan->GetOdometricPose().GetHeading();
+    pose.scanId = pScan->GetStateId();
+    poseVector.push_back(pose);
+    std::cout << "Stored Pose: x=" << pose.x
+              << ", y=" << pose.y
+              << ", yaw=" << pose.yaw
+              << ", nScans=" << pose.scanId << std::endl;
+}
+
+void Mapper::UpdateStoredPoses()
+{
+    for (auto& pose : poseVector) {
+        
+        LocalizedRangeScan* scan = m_pMapperSensorManager->GetScan(pose.scanId);
+        if (scan == nullptr) {
+            std::cerr << "No scan found for scanId: " << pose.scanId << std::endl;
+            continue;
+        }
+
+        pose.x = scan->GetCorrectedPose().GetX();
+        pose.y = scan->GetCorrectedPose().GetY();
+        pose.yaw = scan->GetCorrectedPose().GetHeading();
+
+        std::cout << "Updated Stored Pose for scanId: " << pose.scanId
+                  << " -> X=" << pose.x
+                  << ", Y=" << pose.y
+                  << ", Yaw=" << pose.yaw << std::endl;
     }
 }
 
