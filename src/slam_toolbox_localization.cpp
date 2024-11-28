@@ -253,43 +253,41 @@ void LocalizationSlamToolbox::triggerTableSave(){
     boost::mutex::scoped_lock lock(smapper_mutex_);
     smapper_->getMapper()->StartTableStorage(true);
     // but its get the last data.
-    getSavedTableData();
+    // getSavedTableData();
   }
 }
 
-void LocalizationSlamToolbox::getSavedTableData() {
-  if (processor_type_ == PROCESS) {
-    RCLCPP_INFO(get_logger(), "Getting saved table data");
-    std::cout << "Pose vector size: " << smapper_->getMapper()->poseVector.size() << std::endl;
+// void LocalizationSlamToolbox::getSavedTableData() {
+//   if (processor_type_ == PROCESS) {
+//     RCLCPP_INFO(get_logger(), "Getting saved table data");
+//     std::cout << "Pose vector size: " << smapper_->getMapper()->poseVector.size() << std::endl;
+//     std::cout <<" map frame" << map_frame_ << std::endl;
 
-    if (smapper_->getMapper()->poseVector.size() > 0) {
-      const std::vector<karto::Mapper::TablePose>& localPoseVector = smapper_->getMapper()->poseVector;
-      visualization_msgs::msg::MarkerArray marker_array;
+//     if (smapper_->getMapper()->poseVector.size() > 0) {
+//       std::vector<karto::Mapper::TablePose>& localPoseVector = smapper_->getMapper()->poseVector;
+//       visualization_msgs::msg::MarkerArray marker_array;
+//       for (const auto& pose : localPoseVector) {
+//           std::cout << "Pose ID: " << pose.scanId
+//                     << ", X: " << pose.x
+//                     << ", Y: " << pose.y
+//                     << ", Yaw: " << pose.yaw << std::endl;
+//           visualization_msgs::msg::Marker rectangle_marker =
+//               vis_utils::toRectangleMarker(
+//                   "map",                   // Frame ID
+//                   "pose_visualization",    // Namespace
+//                   pose.x, pose.y, pose.yaw, // Pose: x, y, yaw
+//                   1.0, 0.1,                // Width and height of the rectangle
+//                   0.1,                     // Line width (scale)
+//                   {1.0, 0.0, 0.0, 1.0},    // Color: red (RGBA)
+//                   shared_from_this());     // Node pointer
 
-      for (const auto& pose : localPoseVector) {
-        std::cout << "Pose ID: " << pose.scanId
-                  << ", X: " << pose.x
-                  << ", Y: " << pose.y
-                  << ", Yaw: " << pose.yaw << std::endl;
-
-        // Create a sphere marker for the pose
-        visualization_msgs::msg::Marker sphere_marker =
-            vis_utils::toSphereMarker(
-                "map",                   // Frame ID
-                "pose_visualization",    // Namespace
-                pose.x, pose.y, pose.yaw, // Position (yaw not visualized in a sphere)
-                0.2,                     // Scale (sphere radius)
-                {0.0, 1.0, 0.0, 1.0},    // Color: green (RGBA)
-                shared_from_this());     // Node pointer
-
-        sphere_marker.id = pose.scanId; // Assign unique ID to avoid marker conflicts
-        marker_array.markers.push_back(sphere_marker);
-      }
-
-      marker_pub_->publish(marker_array);
-    }
-  }
-}
+//           rectangle_marker.id = pose.scanId;
+//           marker_array.markers.push_back(rectangle_marker);
+//       }
+//       marker_pub_->publish(marker_array);
+//     }
+//   }
+// }
 
 void LocalizationSlamToolbox::set_parameters_callback(
     const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
