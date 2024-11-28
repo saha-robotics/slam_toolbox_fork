@@ -149,7 +149,7 @@ inline visualization_msgs::msg::Marker toRectangleMarker(
   const double & width,
   const double & height,
   const double & scale,
-  const std::array<double, 4> & color,  
+  const std::array<double, 4> & color,  // RGBA array
   rclcpp::Node::SharedPtr node)
 {
   visualization_msgs::msg::Marker marker;
@@ -158,26 +158,53 @@ inline visualization_msgs::msg::Marker toRectangleMarker(
   marker.header.frame_id = frame;
   marker.header.stamp = node->now();
   marker.ns = ns;
-  marker.type = visualization_msgs::msg::Marker::SPHERE;
+  marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
   marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
 
-  // Set position
-  marker.pose.position.x = x;
-  marker.pose.position.y = y;
-  marker.pose.position.z = 0.0;
-  marker.pose.orientation.w = 1.0; // No rotation for a sphere
-
-  // Set scale
-  marker.scale.x = scale;
-  marker.scale.y = scale;
-  marker.scale.z = scale;
-
-  // Set color
+  marker.scale.x = scale;  // Line width
   marker.color.r = color[0];
   marker.color.g = color[1];
   marker.color.b = color[2];
   marker.color.a = color[3];
-  
+
+  // Calculate rectangle corners
+  double half_width = width / 2.0;
+  double half_height = height / 2.0;
+
+  double cos_yaw = cos(yaw);
+  double sin_yaw = sin(yaw);
+
+  std::vector<geometry_msgs::msg::Point> corners(5);
+
+  // Top-right corner
+  corners[0].x = x + (cos_yaw * half_width - sin_yaw * half_height);
+  corners[0].y = y + (sin_yaw * half_width + cos_yaw * half_height);
+  corners[0].z = 0.0;
+
+  // Top-left corner
+  corners[1].x = x + (cos_yaw * -half_width - sin_yaw * half_height);
+  corners[1].y = y + (sin_yaw * -half_width + cos_yaw * half_height);
+  corners[1].z = 0.0;
+
+  // Bottom-left corner
+  corners[2].x = x + (cos_yaw * -half_width - sin_yaw * -half_height);
+  corners[2].y = y + (sin_yaw * -half_width + cos_yaw * -half_height);
+  corners[2].z = 0.0;
+
+  // Bottom-right corner
+  corners[3].x = x + (cos_yaw * half_width - sin_yaw * -half_height);
+  corners[3].y = y + (sin_yaw * half_width + cos_yaw * -half_height);
+  corners[3].z = 0.0;
+
+  // Close the rectangle
+  corners[4] = corners[0];
+
+  // Add corners to the marker
+  for (const auto & corner : corners) {
+    marker.points.push_back(corner);
+  }
+
   return marker;
 }
 

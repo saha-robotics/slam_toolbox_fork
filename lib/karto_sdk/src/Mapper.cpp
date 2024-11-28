@@ -3571,9 +3571,9 @@ void Mapper::SetBestResponse(const std::shared_ptr<Mapper::LocalizationInfos>& r
 void Mapper::StorePose(const LocalizedRangeScan * pScan)
 {
     TablePose pose; 
-    pose.x = pScan->GetOdometricPose().GetX();
-    pose.y = pScan->GetOdometricPose().GetY();
-    pose.yaw = pScan->GetOdometricPose().GetHeading();
+    pose.x = pScan->GetCorrectedPose().GetX();
+    pose.y = pScan->GetCorrectedPose().GetY();
+    pose.yaw = pScan->GetCorrectedPose().GetHeading();
     pose.scanId = pScan->GetStateId();
     poseVector.push_back(pose);
     std::cout << "Stored Pose: x=" << pose.x
