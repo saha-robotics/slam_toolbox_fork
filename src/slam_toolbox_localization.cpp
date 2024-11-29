@@ -39,10 +39,9 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::bind(&LocalizationSlamToolbox::clearLocalizationBuffer, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-  ssGetBestResponse_ = this->create_service<slam_toolbox::srv::DesiredPoseChecker>(
-      "slam_toolbox/desired_pose_check",
-      std::bind(&LocalizationSlamToolbox::desiredPoseCheck, this,
-      std::placeholders::_1, std::placeholders::_2));
+  set_parameters_srv_ = this->create_service<slam_toolbox::srv::SetParametersService>(
+    "slam_toolbox/set_dynamic_parameters",
+    std::bind(&LocalizationSlamToolbox::set_parameters_callback, this, std::placeholders::_1, std::placeholders::_2));
 
 
   // in localization mode, we cannot allow for interactive mode
@@ -155,12 +154,6 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   Pose2 & odom_pose)
 /*****************************************************************************/
 {
-  // dirty storage:
-  last_laser_stored_ = laser;
-  last_scan_stored_ = scan;
-  last_odom_pose_stored_ = odom_pose;
-  have_scan_values_ = true;
-
   boost::mutex::scoped_lock l(pose_mutex_);
 
   if (processor_type_ == PROCESS_LOCALIZATION && process_near_pose_) {
@@ -229,9 +222,11 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   return range_scan;
 }
 
-void LocalizationSlamToolbox::setInitialParametersForDesiredPose(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
+
+void LocalizationSlamToolbox::setInitialParameters(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
                           double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
-                          double position_search_smear_deviation,bool do_loop_closing_flag){
+                          double position_search_smear_deviation,bool do_loop_closing_flag,
+                          int scan_buffer_size){
 
   smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance);
   smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_maximum_distance);
@@ -241,128 +236,103 @@ void LocalizationSlamToolbox::setInitialParametersForDesiredPose(double position
   smapper_->getMapper()->setParamLoopSearchSpaceResolution(position_search_resolution);
   smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(position_search_smear_deviation);
   smapper_->getMapper()->setParamDoLoopClosing(do_loop_closing_flag);
-  smapper_->getMapper()->m_Initialized = false;
-
-}
-
-/*****************************************************************************/
-bool LocalizationSlamToolbox::desiredPoseCheck(
-    const std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Request> req,
-    std::shared_ptr<slam_toolbox::srv::DesiredPoseChecker::Response> res) 
-/*****************************************************************************/
-{
-  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-  std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-  Matrix3 covariance;
-  LocalizedRangeScan * range_scan = nullptr;
-  covariance.SetToIdentity();
-  {
-    boost::mutex::scoped_lock lock(smapper_mutex_);
-    smapper_->clearLocalizationBuffer();
-  }
-
-  if (req->pose_x == 0.0 || req->pose_y == 0.0) {
-      RCLCPP_ERROR(get_logger(), "Error: pose_x or pose_y is not provided or cannot be equal to <0.0>");
-      res->message = "Error: pose_x or pose_y is missing. Please use it";
-      res->success = false;
-      return false;
-  }
-
-  if (req->do_relocalization){
-    RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Searching for best response with relocalize");
-    position_search_do_relocalization_ = true;
-  } else {
-    RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Searching for best response without relocalize");
-    position_search_do_relocalization_ = false;
-  }
-
-  {
-    boost::mutex::scoped_lock l(pose_mutex_);
-    process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, 0.0);
-  }
-
-  first_measurement_ = true;
-
-  {
-    boost::mutex::scoped_lock lock(smapper_mutex_);
-    setInitialParametersForDesiredPose(position_search_distance_,((position_search_distance_*0.5)-1), position_search_fine_angle_offset_,
-                          position_search_coarse_angle_offset_, position_search_coarse_angle_resolution_, 
-                          position_search_resolution_, position_search_smear_deviation_,true); 
-
-    if (req->search_distance != 0.0) {
-      position_search_distance_ = req->search_distance;
-      setInitialParametersForDesiredPose(position_search_distance_,((position_search_distance_*0.5)-1), position_search_fine_angle_offset_,
-                            position_search_coarse_angle_offset_, position_search_coarse_angle_resolution_, 
-                            position_search_resolution_, position_search_smear_deviation_,true); 
-    } 
-  }
-
-  if (!have_scan_values_) {
-    res->message = "No scan values stored try later";             
-    res->success = false;
-    return false;
+  smapper_->getMapper()->setParamScanBufferSize(scan_buffer_size);
+  if(processor_type_ == PROCESS_LOCALIZATION){
+    smapper_->getMapper()->m_Initialized = false;
   }
   else{
-        bool processed = false;
-        {    
-          boost::mutex::scoped_lock l(pose_mutex_);
-          process_desired_pose_ = std::make_unique<Pose2>(req->pose_x, req->pose_y, 0.0);
-          range_scan = getLocalizedRangeScan(last_laser_stored_, last_scan_stored_, last_odom_pose_stored_);
+    smapper_->getMapper()->GetGraph()->UpdateLoopScanMatcher(this->get_parameter("max_laser_range").as_double());
+  }
+}
 
-          boost::mutex::scoped_lock lock(smapper_mutex_);
-          range_scan->SetOdometricPose(*process_desired_pose_);
-          range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
-          processed = smapper_->getMapper()->ProcessAgainstNodesNearBy(range_scan, true, &covariance);
-        
-          if (processed) {
-            std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
-            double best_response = response->bestResponse;
-            double best_pose_x = response->bestPoseX;
-            double best_pose_y = response->bestPoseY;
+void LocalizationSlamToolbox::set_parameters_callback(
+    const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
+    std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response
+) 
+{
+    if (request->default_mode) {
+        RCLCPP_INFO(get_logger(), "Setting parameters for the default mode");
+        boost::mutex::scoped_lock lock(smapper_mutex_);
+        setInitialParameters(
+            this->get_parameter("loop_search_space_dimension").as_double(),
+            this->get_parameter("loop_search_maximum_distance").as_double(), 
+            this->get_parameter("fine_search_angle_offset").as_double(),
+            this->get_parameter("coarse_search_angle_offset").as_double(),
+            this->get_parameter("coarse_angle_resolution").as_double(),
+            this->get_parameter("loop_search_space_resolution").as_double(),
+            this->get_parameter("loop_search_space_smear_deviation").as_double(),
+            this->get_parameter("do_loop_closing").as_bool(),
+            this->get_parameter("scan_buffer_size").as_int()
+        );
 
-            if (best_response > position_search_minimum_best_response_) {
+        response->success = true;
+        response->message = "Default parameters set successfully.";
+        return;
+    } 
 
-                if (position_search_do_relocalization_) {
-                  setTransformFromPoses(range_scan->GetCorrectedPose(), last_odom_pose_stored_,
-                    last_scan_stored_->header.stamp, true);
+    if (request->param_names.size() != request->param_values.size()) {
+        response->success = false;
+        response->message = "Mismatched param_names and param_values lengths.";
+        return;
+    }
 
-                  publishPose(range_scan->GetCorrectedPose(), covariance, last_scan_stored_->header.stamp);
-                }
-                else {
-                  range_scan->SetOdometricPose(last_odom_pose_stored_);
-                  range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
-                }
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    // main purpose is resetting all the parameters first call. then initialize.
+    setInitialParameters(
+        this->get_parameter("loop_search_space_dimension").as_double(),
+        this->get_parameter("loop_search_maximum_distance").as_double(), 
+        this->get_parameter("fine_search_angle_offset").as_double(),
+        this->get_parameter("coarse_search_angle_offset").as_double(),
+        this->get_parameter("coarse_angle_resolution").as_double(),
+        this->get_parameter("loop_search_space_resolution").as_double(),
+        this->get_parameter("loop_search_space_smear_deviation").as_double(),
+        this->get_parameter("do_loop_closing").as_bool(),
+        this->get_parameter("scan_buffer_size").as_int()
+    );
 
-                setInitialParametersForDesiredPose(this->get_parameter("loop_search_space_dimension").as_double(),this->get_parameter("loop_search_maximum_distance").as_double(), 
-                                                  this->get_parameter("fine_search_angle_offset").as_double(),this->get_parameter("coarse_search_angle_offset").as_double(),
-                                                  this->get_parameter("coarse_angle_resolution").as_double(),this->get_parameter("loop_search_space_resolution").as_double(),
-                                                  this->get_parameter("loop_search_space_smear_deviation").as_double(),this->get_parameter("do_loop_closing").as_bool());
+    for (size_t i = 0; i < request->param_names.size(); ++i) {
+        const auto &param_name = request->param_names[i];
+        const auto &param_value = request->param_values[i];
 
-                res->message = "Found bestResponse";
-                res->relocated_x= static_cast<float>(best_pose_x);
-                res->relocated_y= static_cast<float>(best_pose_y);
-                res->best_response = static_cast<float>(best_response);
-
-                res->success = true;
-                return true; 
-            } else {
-                smapper_->clearLocalizationBuffer();
-                setInitialParametersForDesiredPose(this->get_parameter("loop_search_space_dimension").as_double(),this->get_parameter("loop_search_maximum_distance").as_double(), 
-                                                  this->get_parameter("fine_search_angle_offset").as_double(),this->get_parameter("coarse_search_angle_offset").as_double(),
-                                                  this->get_parameter("coarse_angle_resolution").as_double(),this->get_parameter("loop_search_space_resolution").as_double(),
-                                                  this->get_parameter("loop_search_space_smear_deviation").as_double(),this->get_parameter("do_loop_closing").as_bool());
-
-                res->message = "Couldn't find bestResponse";
-                res->success = false;
-                return false;
-            }
-          }
-        res->message = "Couldn't find with this resolution at desired time, halving the angle_resolution and decreasing best_response then search again.";
-        res->success = false;
-        return false;
+        if (param_name == "loop_search_maximum_distance") {
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
+        } 
+        else if (param_name == "loop_search_space_dimension") {
+            smapper_->getMapper()->setParamLoopSearchSpaceDimension(param_value);
+        } 
+        else if (param_name == "loop_search_space_resolution"){
+            smapper_->getMapper()->setParamLoopSearchSpaceResolution(param_value);
+        }
+        else if (param_name == "loop_search_space_smear_deviation"){
+            smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(param_value);
+        }
+        else if (param_name == "loop_search_maximum_distance"){
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
+        }
+        else if (param_name == "correlation_search_space_dimension"){
+            smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(param_value);
+        }
+        else if (param_name == "scan_buffer_size"){
+            int value =static_cast<int>(param_value);
+            smapper_->getMapper()->setParamScanBufferSize(value);        
+        }
+        else {
+            RCLCPP_ERROR(get_logger(),
+              "Parameter not recognized. Returning false");
         }
     }
+
+    if(processor_type_ == PROCESS_LOCALIZATION){
+      smapper_->getMapper()->m_Initialized = false;
+    }
+    else{
+      smapper_->getMapper()->GetGraph()->UpdateLoopScanMatcher(this->get_parameter("max_laser_range").as_double());
+    }
+    response->success = true;
+    response->message = "Parameters set successfully for the specified mode";
 }
+
+
 
 /*****************************************************************************/
 void LocalizationSlamToolbox::localizePoseCallback(

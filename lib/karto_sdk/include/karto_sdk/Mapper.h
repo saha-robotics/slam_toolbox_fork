@@ -2176,7 +2176,7 @@ private:
 public:
   void SetUseScanMatching(kt_bool val) {m_pUseScanMatching->SetValue(val);}
   kt_bool m_Initialized;
-protected:
+protected:  
 
   kt_bool m_Deserialized;
 

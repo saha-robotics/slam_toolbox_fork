@@ -1111,15 +1111,6 @@ void ScanMatcher::AddScan(
 {
   PointVectorDouble validPoints = FindValidPoints(pScan, rViewPoint);
 
-#ifdef KARTO_DEBUG
-  if (!validPoints.empty()) {
-    std::cout <<"validPoints is representing added points from chain" << std::endl;
-    std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
-              << validPoints.begin()->GetY() << ")" << std::endl;
-  } else {
-    std::cout << "validPoints is empty!" << std::endl;
-  }
-#endif
   // put in all valid points
   const_forEach(PointVectorDouble, &validPoints)
   {
@@ -2158,12 +2149,6 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
     if (squaredDistance <
       math::Square(m_pMapper->m_pLoopSearchMaximumDistance->GetValue()) + KT_TOLERANCE)
     {
-#ifdef KARTO_DEBUG
-      std::cout << "Candidate Scan Position which is chains: (" 
-                << pCandidateScan->GetCorrectedPose().GetX() << ", "
-                << pCandidateScan->GetCorrectedPose().GetY() << ", "
-                << pCandidateScan->GetCorrectedPose().GetHeading() << ")" << std::endl;
-#endif
       // a linked scan cannot be in the chain
       if (find(nearLinkedScans.begin(), nearLinkedScans.end(),
         pCandidateScan) != nearLinkedScans.end())
@@ -2219,12 +2204,10 @@ void MapperGraph::UpdateLoopScanMatcher(kt_double rangeThreshold)
   if (m_pLoopScanMatcher) {
     delete m_pLoopScanMatcher;
   }
-#ifdef KARTO_DEBUG
   std::cout << "\n\n\n UpdateLoopScanMatcher function is called\n\n\n" << std::endl;
   std::cout << "m_pMapper->m_pLoopSearchSpaceDimension->GetValue() " << m_pMapper->m_pLoopSearchSpaceDimension->GetValue() << std::endl;
   std::cout << "m_pMapper->m_pLoopSearchSpaceResolution->GetValue() " << m_pMapper->m_pLoopSearchSpaceResolution->GetValue() << std::endl;
   std::cout << "m_pMapper->m_pLoopSearchSpaceSmearDeviation->GetValue() " << m_pMapper->m_pLoopSearchSpaceSmearDeviation->GetValue() << std::endl;
-#endif
   m_pLoopScanMatcher = ScanMatcher::Create(m_pMapper,
     m_pMapper->m_pLoopSearchSpaceDimension->GetValue(),
     m_pMapper->m_pLoopSearchSpaceResolution->GetValue(),

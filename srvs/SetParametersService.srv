@@ -1,0 +1,8 @@
+string[] param_names
+float64[] param_values
+bool default_mode
+
+---
+
+bool success
+string message
