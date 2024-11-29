@@ -2001,12 +2001,12 @@ public:
   };
 
   std::vector<TablePose> poseVector;
-  kt_bool saveTableData_;
+  kt_bool saveTableData_{false};
 
   void StartTableStorage(kt_bool saveTableData);
   void StorePose(const LocalizedRangeScan* pScan);
   void UpdateStoredPoses();
-  bool tableSaveComplete_ = false;
+  bool tableSaveComplete_{false};
 
   // void updatedTableData(LocalizedRangeScan* pScan);
   
