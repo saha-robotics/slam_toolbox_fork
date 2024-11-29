@@ -1113,25 +1113,16 @@ void ScanMatcher::AddScan(
 
 #ifdef KARTO_DEBUG
   if (!validPoints.empty()) {
-    std::cout <<"validPoints is representing added points from chain" << std::endl;
+    std::cout << "validPoints is representing added points from chain" << std::endl;
+
+    // Print the first valid point's coordinates and address
     std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
-              << validPoints.begin()->GetY() << ")" << std::endl;
+              << validPoints.begin()->GetY() << ") at address: " << &(*validPoints.begin()) << std::endl;
+
   } else {
     std::cout << "validPoints is empty!" << std::endl;
   }
 #endif
-
-  // if (!validPoints.empty()) {
-  //   std::cout << "validPoints is representing added points from chain" << std::endl;
-
-  //   // Print the first valid point's coordinates and address
-  //   std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
-  //             << validPoints.begin()->GetY() << ") at address: " << &(*validPoints.begin()) << std::endl;
-
-
-  // } else {
-  //   std::cout << "validPoints is empty!" << std::endl;
-  // }
 
   // put in all valid points
   const_forEach(PointVectorDouble, &validPoints)
@@ -2210,24 +2201,11 @@ void MapperGraph::CorrectPoses()
 #endif
     const_forEach(ScanSolver::IdPoseVector, &pSolver->GetCorrections())
     {
-      std::cout << "\n\nProcessing correction for ID: " << iter->first << std::endl;
       LocalizedRangeScan * scan = m_pMapper->m_pMapperSensorManager->GetScan(iter->first);
       if (scan == NULL) {
         continue;
       }
-      // Print the corrected pose (iter->second)
-      std::cout << "Corrected Pose: X=" << iter->second.GetX()
-                << " Y=" << iter->second.GetY()
-                << " Heading=" << iter->second.GetHeading() << std::endl;
-
-      scan->SetCorrectedPoseAndUpdate(iter->second);
-    
-      std::cout << "Updated Scan Pose: X=" << scan->GetCorrectedPose().GetX()
-                << " Y=" << scan->GetCorrectedPose().GetY()
-                << " Heading=" << scan->GetCorrectedPose().GetHeading() << std::endl;
-      std::cout << "Scan object address: " << scan << std::endl;
-      std::cout << "Corrected Pose Address: " << &iter->second << "\n\n" << std::endl;
-
+      scan->SetCorrectedPoseAndUpdate(iter->second); 
     }
     pSolver->Clear();
   }
@@ -2961,17 +2939,11 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     m_pMapperSensorManager->AddScan(pScan);
 
     if (saveTableData_ == true) {
-      
+      std::cout << "\n\nStoreTablePose function has been called\n";
       StorePose(pScan);
-      std::cout << "POse of the scan: " << pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() <<
-                                    " " << pScan->GetOdometricPose().GetHeading() << std::endl;
-
       saveTableData_ = false;
     }
     
-    // m_pMapperTableManager->AddTable(pScan);
-    // AccessByIndex(pScan);
-
     if (m_pUseScanMatching->GetValue()) {
       // add to graph
 
@@ -2992,7 +2964,6 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     }
 
     m_pMapperSensorManager->SetLastScan(pScan);
-    std::cout <<"\n\nAddedScan is PRocess "<< pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() << " " << pScan->GetOdometricPose().GetHeading() << std::endl;
 
     return true;
   }

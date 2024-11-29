@@ -2007,8 +2007,6 @@ public:
   void StorePose(const LocalizedRangeScan* pScan);
   void UpdateStoredPoses();
   bool tableSaveComplete_{false};
-
-  // void updatedTableData(LocalizedRangeScan* pScan);
   
   /**
    * Allocate memory needed for mapping
