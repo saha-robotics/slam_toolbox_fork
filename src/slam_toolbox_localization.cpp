@@ -44,9 +44,6 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::bind(&LocalizationSlamToolbox::set_parameters_callback, this,
     std::placeholders::_1, std::placeholders::_2));
 
-  marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-      "slam_toolbox/table_vis", 10);
-
   // in localization mode, we cannot allow for interactive mode
   enable_interactive_mode_ = false;
 
@@ -224,12 +221,13 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
 
   return range_scan;
 }
-
+/*****************************************************************************/
 void LocalizationSlamToolbox::setInitialParameters(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
                           double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
                           double position_search_smear_deviation,bool do_loop_closing_flag,
-                          int scan_buffer_size){
-
+                          int scan_buffer_size)
+/*****************************************************************************/          
+{
   smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance);
   smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_maximum_distance);
   smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset);
@@ -247,23 +245,35 @@ void LocalizationSlamToolbox::setInitialParameters(double position_search_distan
   }
 }
 
-void LocalizationSlamToolbox::triggerTableSave(){
-  if (processor_type_ == PROCESS){
-    RCLCPP_INFO(get_logger(), "Triggering table save function");
-    boost::mutex::scoped_lock lock(smapper_mutex_);
-    smapper_->getMapper()->StartTableStorage(true);
 
-  }
-}
-
+/*****************************************************************************/
 void LocalizationSlamToolbox::set_parameters_callback(
     const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
     std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response
 ) 
+/*****************************************************************************/
 {
     if(request->table_save_mode){
-      triggerTableSave();
-      RCLCPP_INFO(get_logger(), "Triggering table save service");
+      if (processor_type_ == PROCESS){
+        if (request->target_uid.empty()){
+          RCLCPP_ERROR(get_logger(), "Triggering target save without target name or type");
+          response->success = false;
+          response->message = "There is no target name! Please provide a target name.";
+          return;
+        }
+        else{
+          RCLCPP_INFO(get_logger(), "Triggering target save function");
+          boost::mutex::scoped_lock lock(smapper_mutex_);
+          smapper_->getMapper()->StartTableStorage(true,request->target_uid);
+        } 
+      }
+    }
+
+    if(request->target_list_off){
+      if (processor_type_ == PROCESS){
+        boost::mutex::scoped_lock lock(smapper_mutex_);
+        smapper_->getMapper()->tableVectorUpdated_= true;
+      }
     }
 
     if (request->default_mode) {
