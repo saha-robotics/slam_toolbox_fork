@@ -2941,7 +2941,7 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     if (saveTableData_ == true) {
       std::cout << "\n\nStoreTablePose function has been called\n";
       StorePose(pScan);
-      saveTableData_ = false;
+      saveTableData_= false;
     }
     
     if (m_pUseScanMatching->GetValue()) {
@@ -3546,11 +3546,13 @@ void Mapper::StorePose(const LocalizedRangeScan * pScan)
     pose.y = pScan->GetCorrectedPose().GetY();
     pose.yaw = pScan->GetCorrectedPose().GetHeading();
     pose.scanId = pScan->GetStateId();
+    pose.targetName = saveTargetName_;
     poseVector.push_back(pose);
     std::cout << "Stored Pose: x=" << pose.x
               << ", y=" << pose.y
               << ", yaw=" << pose.yaw
-              << ", nScans=" << pose.scanId << std::endl;
+              << ", nScans=" << pose.scanId 
+              << ", targetName=" << pose.targetName << std::endl;
 }
 
 void Mapper::UpdateStoredPoses()
@@ -3572,11 +3574,13 @@ void Mapper::UpdateStoredPoses()
                   << ", Y=" << pose.y
                   << ", Yaw=" << pose.yaw << std::endl;
     }
+    tableVectorUpdated_ = true;
 }
 
-void Mapper::StartTableStorage(kt_bool saveTableData)
+void Mapper::StartTableStorage(kt_bool saveTableData, const std::string& saveTargetName)
 {
   saveTableData_ = saveTableData;
+  saveTargetName_ = saveTargetName;
 }
 
 void Mapper::SetScanSolver(ScanSolver * pScanOptimizer)

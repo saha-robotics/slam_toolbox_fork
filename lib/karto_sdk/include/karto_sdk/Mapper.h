@@ -1993,17 +1993,14 @@ public:
       double y;
       double yaw;
       kt_int32u scanId;
-  };
-  enum class ProcessStatus {
-      Success,         
-      TableSaved,      
-      Failed           
+      std::string targetName;
   };
 
   std::vector<TablePose> poseVector;
   kt_bool saveTableData_{false};
-
-  void StartTableStorage(kt_bool saveTableData);
+  std::string saveTargetName_ = "masa_0";
+  kt_bool tableVectorUpdated_{false};
+  void StartTableStorage(kt_bool saveTableData, const std::string & saveTargetName);
   void StorePose(const LocalizedRangeScan* pScan);
   void UpdateStoredPoses();
   bool tableSaveComplete_{false};
