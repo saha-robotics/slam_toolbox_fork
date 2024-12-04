@@ -67,7 +67,6 @@ protected:
     double position_search_smear_deviation, bool do_loop_closing_flag,
     int scan_buffer_size);
 
-  void triggerTableSave();
   void getSavedTableData();
 
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
