@@ -3167,8 +3167,7 @@ kt_bool Mapper::ProcessLocalization(LocalizedRangeScan * pScan, Matrix3 * covari
 
   m_pMapperSensorManager->SetLastScan(pScan);
   AddScanToLocalizationBuffer(pScan, scan_vertex);
-  std::cout <<"\n\nAddedScan is "<< pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() << " " << pScan->GetOdometricPose().GetHeading() << std::endl;
-  // AddScanPoseToTableData(pScan);
+  // std::cout <<"\n\nAddedScan is "<< pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() << " " << pScan->GetOdometricPose().GetHeading() << std::endl;
   return true;
 }
 
