@@ -67,6 +67,12 @@ protected:
     double position_search_smear_deviation, bool do_loop_closing_flag,
     int scan_buffer_size);
 
+  void getSavedTableData();
+
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+  bool tableSaveComplete_ = false;
+
+
   std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
   localization_pose_sub_;
 

@@ -272,6 +272,9 @@ void SlamToolbox::setROSInterfaces()
     std::bind(&SlamToolbox::deserializePoseGraphCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  ssSaved_target_data_ = this->create_publisher<slam_toolbox::msg::SavedTargetInfoArray>(
+    "slam_toolbox/saved_target_data", qos);
+
   scan_filter_sub_ =
     std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(
     shared_from_this().get(), scan_topic_, rmw_qos_profile_sensor_data);
@@ -648,6 +651,24 @@ LocalizedRangeScan * SlamToolbox::addScan(
 
   if (processor_type_ == PROCESS) {
     processed = smapper_->getMapper()->Process(range_scan, &covariance);
+    if(smapper_->getMapper()->tableVectorUpdated_){
+
+      smapper_->getMapper()->tableVectorUpdated_= false;
+      auto target_array_msg = slam_toolbox::msg::SavedTargetInfoArray();
+      
+      for (const auto &pose : smapper_->getMapper()->poseVector) {
+          slam_toolbox::msg::SavedTargetInfo target_msg;
+          target_msg.x = pose.x;           
+          target_msg.y = pose.y;           
+          target_msg.yaw = pose.yaw;       
+          target_msg.scan_id = pose.scanId;  
+          target_msg.target_uid = pose.targetName;  
+
+          target_array_msg.targets.push_back(target_msg);
+      }
+
+      ssSaved_target_data_->publish(target_array_msg);
+    }
   } else if (processor_type_ == PROCESS_FIRST_NODE) {
     processed = smapper_->getMapper()->ProcessAtDock(range_scan, &covariance);
     processor_type_ = PROCESS;
