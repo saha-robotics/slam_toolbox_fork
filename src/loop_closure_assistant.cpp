@@ -259,6 +259,23 @@ void LoopClosureAssistant::publishGraph()
   marray.markers.push_back(edges_marker);
   marray.markers.push_back(localization_edges_marker);
 
+  // Here is for 
+  const auto& localPoseVector = mapper_->poseVector;  
+  for (const auto& pose : localPoseVector) {
+    visualization_msgs::msg::Marker rectangle_marker =
+        vis_utils::toRectangleMarker(
+            "map",                   // Frame ID
+            "pose_visualization",    // Namespace
+            pose.x, pose.y, pose.yaw, // Pose: x, y, yaw
+            1.0, 0.1,                // Width and height of the rectangle
+            0.1,                     // Line width (scale)
+            {1.0, 0.0, 0.0, 1.0},    // Color: red (RGBA)
+            node_);                  // Node pointer
+
+    rectangle_marker.id = pose.scanId + 5000;  // Ensure unique IDs for these markers
+    marray.markers.push_back(rectangle_marker);
+  }
+
   // if disabled, clears out old markers
   interactive_server_->applyChanges();
   marker_publisher_->publish(marray);
