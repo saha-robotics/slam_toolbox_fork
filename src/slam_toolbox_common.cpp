@@ -373,6 +373,12 @@ void SlamToolbox::publishVisualizations()
     else{
       updateMap();
     }
+    if (!isPaused(VISUALIZING_GRAPH)) {
+      boost::mutex::scoped_lock lock(smapper_mutex_);
+      closure_assistant_->publishGraph();
+    }
+    r.sleep();
+  }
 }
 
 /*****************************************************************************/
