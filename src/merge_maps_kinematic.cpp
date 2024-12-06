@@ -95,11 +95,12 @@ bool MergeMapsKinematic::addSubmapCallback(
   scans_vec_.push_back(scans);
   num_submaps_++;
 
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local();
   // create and publish map with marker that will move the map around
   sstS_.push_back(this->create_publisher<nav_msgs::msg::OccupancyGrid>(
-      "/map_" + std::to_string(num_submaps_), rclcpp::QoS(1)));
+      "/map_" + std::to_string(num_submaps_), qos));
   sstmS_.push_back(this->create_publisher<nav_msgs::msg::MapMetaData>(
-      "/map_metadata_" + std::to_string(num_submaps_), rclcpp::QoS(1)));
+      "/map_metadata_" + std::to_string(num_submaps_), qos));
   sleep(1.0);
 
   nav_msgs::srv::GetMap::Response map;
@@ -118,8 +119,6 @@ bool MergeMapsKinematic::addSubmapCallback(
     og.info.width * og.info.resolution / 2.0,
     og.info.origin.position.y + og.info.height * og.info.resolution / 2.0,
     0.));
-  og.info.origin.position.x = -(og.info.width * og.info.resolution / 2.0);
-  og.info.origin.position.y = -(og.info.height * og.info.resolution / 2.0);
   og.header.stamp = this->now();
   og.header.frame_id = "map_" + std::to_string(num_submaps_);
   sstS_[num_submaps_]->publish(og);

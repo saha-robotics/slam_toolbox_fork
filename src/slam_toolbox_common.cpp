@@ -75,6 +75,9 @@ void SlamToolbox::configure()
   transform_publish_period =
     this->declare_parameter("transform_publish_period",
       transform_publish_period);
+  publish_map_once_ = this->declare_parameter("publish_map_once",
+    publish_map_once_);
+  this->declare_parameter("map_update_interval",10.0);
   threads_.push_back(std::make_unique<boost::thread>(
       boost::bind(&SlamToolbox::publishTransformLoop,
       this, transform_publish_period)));
@@ -189,6 +192,40 @@ void SlamToolbox::setParams()
   smapper_->configure(shared_from_this());
   this->declare_parameter("paused_new_measurements",rclcpp::ParameterType::PARAMETER_BOOL);
   this->set_parameter({"paused_new_measurements", false});
+
+  /*
+  * Those parameters for pose_search service
+  */
+  position_search_distance_ = 12.0;
+  position_search_distance_ = this->declare_parameter("position_search_distance",
+      position_search_distance_);
+  
+  position_search_resolution_ = 0.05;
+  position_search_resolution_ = this->declare_parameter("position_search_resolution",
+      position_search_resolution_);
+
+  position_search_smear_deviation_ = 0.03;
+  position_search_smear_deviation_ = this->declare_parameter("position_search_smear_deviation",
+      position_search_smear_deviation_);
+
+  position_search_fine_angle_offset_ = 0.00349;
+  position_search_fine_angle_offset_ = this->declare_parameter("position_search_fine_search_angle_offset",
+      position_search_fine_angle_offset_);
+
+  position_search_coarse_angle_offset_ = 3.14;
+  position_search_coarse_angle_offset_ = this->declare_parameter("position_search_coarse_angle_offset",
+      position_search_coarse_angle_offset_);
+
+  position_search_coarse_angle_resolution_ = 0.0349;
+  position_search_coarse_angle_resolution_ = this->declare_parameter("position_search_coarse_angle_resolution",
+      position_search_coarse_angle_resolution_);
+
+  position_search_do_relocalization_ = false;
+  position_search_do_relocalization_ = this->declare_parameter("position_search_do_relocalization",
+      position_search_do_relocalization_);
+
+  position_search_minimum_best_response_ = 0.45;
+  this->get_parameter("loop_match_minimum_response_fine", position_search_minimum_best_response_);
 }
 
 /*****************************************************************************/
@@ -196,6 +233,8 @@ void SlamToolbox::setROSInterfaces()
 /*****************************************************************************/
 {
   double tmp_val = 30.;
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+
   tmp_val = this->declare_parameter("tf_buffer_duration", tmp_val);
   tf_ = std::make_unique<tf2_ros::Buffer>(this->get_clock(),
       tf2::durationFromSec(tmp_val));
@@ -208,6 +247,9 @@ void SlamToolbox::setROSInterfaces()
 
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose", 10);
+  localization_health_pub_ = this->create_publisher<slam_toolbox::msg::SlamMetrics>(
+    "slam_toolbox/slam_metrics", qos);
+
   sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
     map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
   sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
@@ -234,6 +276,9 @@ void SlamToolbox::setROSInterfaces()
     std::bind(&SlamToolbox::resetCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  ssSaved_target_data_ = this->create_publisher<slam_toolbox::msg::SavedTargetInfoArray>(
+    "slam_toolbox/saved_target_data", qos);
+
   scan_filter_sub_ =
     std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(
     shared_from_this().get(), scan_topic_, rmw_qos_profile_sensor_data);
@@ -259,6 +304,33 @@ void SlamToolbox::publishTransformLoop(
     {
       boost::mutex::scoped_lock lock(map_to_odom_mutex_);
       rclcpp::Time scan_timestamp = scan_header.stamp;
+
+      //TODO: In future, we need to remove from there and create new function named as localizationHealthCheck.
+      std::shared_ptr<Mapper::LocalizationInfos> response = smapper_->getMapper()->GetBestResponse();
+
+      double best_response = response->bestResponse;
+      double best_pose_x = response->bestPoseX;
+      double best_pose_y = response->bestPoseY;
+      int near_chain_count = response->nearChainsCount;
+      static double previous_best_response = 0.0;  
+
+      if (best_response > 0.02) {
+          try {
+            if (best_response != previous_best_response) {
+                slam_toolbox::msg::SlamMetrics msg;
+                msg.header.stamp = this->now();
+                msg.best_response = best_response;
+                msg.near_node_count = near_chain_count;
+                localization_health_pub_->publish(msg);
+                previous_best_response = best_response; 
+            }
+          } 
+          catch (std::exception & e) {
+          //TODO: Write publisher topic when cannot acces the result of health check .
+            RCLCPP_ERROR(this->get_logger(), "Exception caught while dereferencing best_response: %s", e.what());
+          }
+      } 
+
       // Avoid publishing tf with initial 0.0 scan timestamp
       if (scan_timestamp.seconds() > 0.0 && !scan_header.frame_id.empty()) {
         geometry_msgs::msg::TransformStamped msg;
@@ -288,6 +360,7 @@ void SlamToolbox::publishVisualizations()
   og.info.origin.orientation.w = 1.0;
   og.header.frame_id = map_frame_;
 
+  auto map_update_interval = this->get_parameter("map_update_interval").as_double();
   double map_update_interval = 10;
   map_update_interval = this->declare_parameter("map_update_interval",
       map_update_interval);
@@ -580,6 +653,24 @@ LocalizedRangeScan * SlamToolbox::addScan(
 
   if (processor_type_ == PROCESS) {
     processed = smapper_->getMapper()->Process(range_scan, &covariance);
+    if(smapper_->getMapper()->tableVectorUpdated_){
+
+      smapper_->getMapper()->tableVectorUpdated_= false;
+      auto target_array_msg = slam_toolbox::msg::SavedTargetInfoArray();
+      
+      for (const auto &pose : smapper_->getMapper()->poseVector) {
+          slam_toolbox::msg::SavedTargetInfo target_msg;
+          target_msg.x = pose.x;           
+          target_msg.y = pose.y;           
+          target_msg.yaw = pose.yaw;       
+          target_msg.scan_id = pose.scanId;  
+          target_msg.target_uid = pose.targetName;  
+
+          target_array_msg.targets.push_back(target_msg);
+      }
+
+      ssSaved_target_data_->publish(target_array_msg);
+    }
   } else if (processor_type_ == PROCESS_FIRST_NODE) {
     processed = smapper_->getMapper()->ProcessAtDock(range_scan, &covariance);
     processor_type_ = PROCESS;

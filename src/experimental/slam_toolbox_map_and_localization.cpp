@@ -66,8 +66,10 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
 
   if (enable_localization) {
     RCLCPP_INFO(get_logger(), "Enabling localization ...");
+    changeMapTopic(map_name_);
+    updateMap();
     processor_type_ = PROCESS_LOCALIZATION;
-
+    publish_map_once_ = this->get_parameter("publish_map_once").as_bool();
     localization_pose_sub_ =
       create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
       "initialpose", 1, std::bind(&MapAndLocalizationSlamToolbox::localizePoseCallback, this, std::placeholders::_1));
@@ -86,6 +88,7 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
     sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
       map_name_ + "_metadata",
       rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    
   }
   else {
     RCLCPP_INFO(get_logger(), "Enabling mapping ...");
@@ -93,8 +96,9 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
     localization_pose_sub_.reset();
     clear_localization_.reset();
     map_saver_ = std::make_unique<map_saver::MapSaver>(shared_from_this(), map_name_);
-
+    changeMapTopic(std::string("map"));
     boost::mutex::scoped_lock lock(smapper_mutex_);
+    publish_map_once_ = false;
     if (smapper_ && !smapper_->getMapper()->GetLocalizationVertices().empty()) {
       smapper_->clearLocalizationBuffer();
     }
@@ -120,6 +124,7 @@ void MapAndLocalizationSlamToolbox::loadPoseGraphByParams()
   }
   else {
     SlamToolbox::loadPoseGraphByParams();
+    changeMapTopic(map_name_);
   }
 }
 
@@ -149,6 +154,7 @@ bool MapAndLocalizationSlamToolbox::deserializePoseGraphCallback(
     return LocalizationSlamToolbox::deserializePoseGraphCallback(request_header, req, resp);
   }
   else {
+    changeMapTopic(map_name_);
     return SlamToolbox::deserializePoseGraphCallback(request_header, req, resp);
   }
 }
@@ -194,6 +200,19 @@ LocalizedRangeScan * MapAndLocalizationSlamToolbox::addScan(
   }
 }
 
+/*****************************************************************************/
+void MapAndLocalizationSlamToolbox::changeMapTopic(const std::string & map_topic)
+/*****************************************************************************/
+{
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    sst_.reset();
+    sstm_.reset();
+    sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+      map_topic, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
+      map_topic + "_metadata",
+      rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+}
 }  // namespace slam_toolbox
 
 #include "rclcpp_components/register_node_macro.hpp"
