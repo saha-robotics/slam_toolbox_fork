@@ -1659,12 +1659,6 @@ public:
   void AddScan(LocalizedRangeScan * pScan);
 
   /**
-   * Add table which is founded position of scan 
-   * @param pScan
-   */
-  void AddTable(LocalizedRangeScan * pScan); 
-
-  /**
    * Adds scan to running scans of device that recorded scan
    * @param pScan
    */
