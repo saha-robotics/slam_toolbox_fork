@@ -1114,13 +1114,17 @@ void ScanMatcher::AddScan(
 
 #ifdef KARTO_DEBUG
   if (!validPoints.empty()) {
-    std::cout <<"validPoints is representing added points from chain" << std::endl;
+    std::cout << "validPoints is representing added points from chain" << std::endl;
+
+    // Print the first valid point's coordinates and address
     std::cout << "validPoints: (" << validPoints.begin()->GetX() << ", "
-              << validPoints.begin()->GetY() << ")" << std::endl;
+              << validPoints.begin()->GetY() << ") at address: " << &(*validPoints.begin()) << std::endl;
+
   } else {
     std::cout << "validPoints is empty!" << std::endl;
   }
 #endif
+
   // put in all valid points
   const_forEach(PointVectorDouble, &validPoints)
   {
@@ -2183,12 +2187,6 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
     if (squaredDistance <
       math::Square(m_pMapper->m_pLoopSearchMaximumDistance->GetValue()) + KT_TOLERANCE)
     {
-#ifdef KARTO_DEBUG
-      std::cout << "Candidate Scan Position which is chains: (" 
-                << pCandidateScan->GetCorrectedPose().GetX() << ", "
-                << pCandidateScan->GetCorrectedPose().GetY() << ", "
-                << pCandidateScan->GetCorrectedPose().GetHeading() << ")" << std::endl;
-#endif
       // a linked scan cannot be in the chain
       if (find(nearLinkedScans.begin(), nearLinkedScans.end(),
         pCandidateScan) != nearLinkedScans.end())
@@ -2232,11 +2230,12 @@ void MapperGraph::CorrectPoses()
       if (scan == NULL) {
         continue;
       }
-      scan->SetCorrectedPoseAndUpdate(iter->second);
+      scan->SetCorrectedPoseAndUpdate(iter->second); 
     }
-
     pSolver->Clear();
   }
+  m_pMapper->UpdateStoredPoses();
+
 }
 
 void MapperGraph::UpdateLoopScanMatcher(kt_double rangeThreshold)
@@ -2244,12 +2243,10 @@ void MapperGraph::UpdateLoopScanMatcher(kt_double rangeThreshold)
   if (m_pLoopScanMatcher) {
     delete m_pLoopScanMatcher;
   }
-#ifdef KARTO_DEBUG
   std::cout << "\n\n\n UpdateLoopScanMatcher function is called\n\n\n" << std::endl;
   std::cout << "m_pMapper->m_pLoopSearchSpaceDimension->GetValue() " << m_pMapper->m_pLoopSearchSpaceDimension->GetValue() << std::endl;
   std::cout << "m_pMapper->m_pLoopSearchSpaceResolution->GetValue() " << m_pMapper->m_pLoopSearchSpaceResolution->GetValue() << std::endl;
   std::cout << "m_pMapper->m_pLoopSearchSpaceSmearDeviation->GetValue() " << m_pMapper->m_pLoopSearchSpaceSmearDeviation->GetValue() << std::endl;
-#endif
   m_pLoopScanMatcher = ScanMatcher::Create(m_pMapper,
     m_pMapper->m_pLoopSearchSpaceDimension->GetValue(),
     m_pMapper->m_pLoopSearchSpaceResolution->GetValue(),
@@ -2934,7 +2931,7 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     }
 
     // test if scan is outside minimum boundary or if heading is larger then minimum heading
-    if (!HasMovedEnough(pScan, pLastScan)) {
+    if (!HasMovedEnough(pScan, pLastScan) && !saveTableData_) {
       return false;
     }
 
@@ -2968,6 +2965,12 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
     // add scan to buffer and assign id
     m_pMapperSensorManager->AddScan(pScan);
 
+    if (saveTableData_ == true) {
+      std::cout << "\n\nStoreTablePose function has been called\n";
+      StorePose(pScan);
+      saveTableData_= false;
+    }
+    
     if (m_pUseScanMatching->GetValue()) {
       // add to graph
 
@@ -2978,6 +2981,8 @@ kt_bool Mapper::Process(LocalizedRangeScan * pScan, Matrix3 * covariance)
 
       if (m_pDoLoopClosing->GetValue()) {
         std::vector<Name> deviceNames = m_pMapperSensorManager->GetSensorNames();
+        size_t index = deviceNames.size();
+
         const_forEach(std::vector<Name>, &deviceNames)
         {
           m_pGraph->TryCloseLoop(pScan, *iter);
@@ -3189,7 +3194,7 @@ kt_bool Mapper::ProcessLocalization(LocalizedRangeScan * pScan, Matrix3 * covari
 
   m_pMapperSensorManager->SetLastScan(pScan);
   AddScanToLocalizationBuffer(pScan, scan_vertex);
-
+  // std::cout <<"\n\nAddedScan is "<< pScan->GetOdometricPose().GetX() << " " << pScan->GetOdometricPose().GetY() << " " << pScan->GetOdometricPose().GetHeading() << std::endl;
   return true;
 }
 
@@ -3559,6 +3564,50 @@ void Mapper::SetBestResponse(const std::shared_ptr<Mapper::LocalizationInfos>& r
             throw std::runtime_error("Mapper FATAL ERROR - One or more bestResponse pointers are null.");
         }
     }
+}
+
+void Mapper::StorePose(const LocalizedRangeScan * pScan)
+{
+    TablePose pose; 
+    pose.x = pScan->GetCorrectedPose().GetX();
+    pose.y = pScan->GetCorrectedPose().GetY();
+    pose.yaw = pScan->GetCorrectedPose().GetHeading();
+    pose.scanId = pScan->GetStateId();
+    pose.targetName = saveTargetName_;
+    poseVector.push_back(pose);
+    std::cout << "Stored Pose: x=" << pose.x
+              << ", y=" << pose.y
+              << ", yaw=" << pose.yaw
+              << ", nScans=" << pose.scanId 
+              << ", targetName=" << pose.targetName << std::endl;
+}
+
+void Mapper::UpdateStoredPoses()
+{
+    for (auto& pose : poseVector) {
+        
+        LocalizedRangeScan* scan = m_pMapperSensorManager->GetScan(pose.scanId);
+        if (scan == nullptr) {
+            std::cerr << "No scan found for scanId: " << pose.scanId << std::endl;
+            continue;
+        }
+
+        pose.x = scan->GetCorrectedPose().GetX();
+        pose.y = scan->GetCorrectedPose().GetY();
+        pose.yaw = scan->GetCorrectedPose().GetHeading();
+
+        std::cout << "Updated Stored Pose for scanId: " << pose.scanId
+                  << " -> X=" << pose.x
+                  << ", Y=" << pose.y
+                  << ", Yaw=" << pose.yaw << std::endl;
+    }
+    tableVectorUpdated_ = true;
+}
+
+void Mapper::StartTableStorage(kt_bool saveTableData, const std::string& saveTargetName)
+{
+  saveTableData_ = saveTableData;
+  saveTargetName_ = saveTargetName;
 }
 
 void Mapper::SetScanSolver(ScanSolver * pScanOptimizer)

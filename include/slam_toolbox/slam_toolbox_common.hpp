@@ -139,6 +139,7 @@ protected:
   std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::MapMetaData>> sstm_;
   std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>> pose_pub_;
   std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::SlamMetrics>> localization_health_pub_; // TODO: Change here
+  std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::SavedTargetInfoArray>> ssSaved_target_data_;
   std::shared_ptr<rclcpp::Service<nav_msgs::srv::GetMap>> ssMap_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::Pause>> ssPauseMeasurements_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::SerializePoseGraph>> ssSerialize_;

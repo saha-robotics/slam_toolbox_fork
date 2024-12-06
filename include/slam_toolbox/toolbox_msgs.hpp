@@ -29,6 +29,9 @@
 #include "visualization_msgs/msg/interactive_marker_control.hpp"
 #include "visualization_msgs/msg/interactive_marker_feedback.hpp"
 
+#include "slam_toolbox/msg/saved_target_info.hpp"
+#include "slam_toolbox/msg/saved_target_info_array.hpp"
+
 #include "slam_toolbox/srv/pause.hpp"
 #include "slam_toolbox/srv/clear_queue.hpp"
 #include "slam_toolbox/srv/toggle_interactive.hpp"
@@ -39,6 +42,6 @@
 #include "slam_toolbox/srv/deserialize_pose_graph.hpp"
 #include "slam_toolbox/srv/merge_maps.hpp"
 #include "slam_toolbox/srv/add_submap.hpp"
-#include "slam_toolbox/srv/desired_pose_checker.hpp"
+#include "slam_toolbox/srv/set_parameters_service.hpp"
 
 #endif  // SLAM_TOOLBOX__TOOLBOX_MSGS_HPP_

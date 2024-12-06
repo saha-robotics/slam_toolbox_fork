@@ -1981,7 +1981,26 @@ public:
   std::shared_ptr<LocalizationInfos> GetBestResponse() const;
   void SetBestResponse(const std::shared_ptr<LocalizationInfos>& response);
 
+  /** 
+   * its for saving the desired pose of the robot
+   */
+  struct TablePose {
+      double x;
+      double y;
+      double yaw;
+      kt_int32u scanId;
+      std::string targetName;
+  };
 
+  std::vector<TablePose> poseVector;
+  kt_bool saveTableData_{false};
+  std::string saveTargetName_ = "masa_0";
+  kt_bool tableVectorUpdated_{false};
+  void StartTableStorage(kt_bool saveTableData, const std::string & saveTargetName);
+  void StorePose(const LocalizedRangeScan* pScan);
+  void UpdateStoredPoses();
+  bool tableSaveComplete_{false};
+  
   /**
    * Allocate memory needed for mapping
    * @param rangeThreshold
@@ -2178,7 +2197,7 @@ private:
 public:
   void SetUseScanMatching(kt_bool val) {m_pUseScanMatching->SetValue(val);}
   kt_bool m_Initialized;
-protected:
+protected:  
 
   kt_bool m_Deserialized;
 
