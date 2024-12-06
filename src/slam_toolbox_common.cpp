@@ -361,19 +361,18 @@ void SlamToolbox::publishVisualizations()
   og.header.frame_id = map_frame_;
 
   auto map_update_interval = this->get_parameter("map_update_interval").as_double();
-  double map_update_interval = 10;
-  map_update_interval = this->declare_parameter("map_update_interval",
-      map_update_interval);
   rclcpp::Rate r(1.0 / map_update_interval);
 
   while (rclcpp::ok()) {
-    updateMap();
-    if (!isPaused(VISUALIZING_GRAPH)) {
-      boost::mutex::scoped_lock lock(smapper_mutex_);
-      closure_assistant_->publishGraph();
+    if(publish_map_once_){
+      if(update_map_once_){
+        updateMap();
+        update_map_once_ = false;
+      }
     }
-    r.sleep();
-  }
+    else{
+      updateMap();
+    }
 }
 
 /*****************************************************************************/
