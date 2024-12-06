@@ -3548,11 +3548,13 @@ void Mapper::StorePose(const LocalizedRangeScan * pScan)
     pose.scanId = pScan->GetStateId();
     pose.targetName = saveTargetName_;
     poseVector.push_back(pose);
+#ifdef KARTO_DEBUG
     std::cout << "Stored Pose: x=" << pose.x
               << ", y=" << pose.y
               << ", yaw=" << pose.yaw
               << ", nScans=" << pose.scanId 
               << ", targetName=" << pose.targetName << std::endl;
+#endif
 }
 
 void Mapper::UpdateStoredPoses()
@@ -3568,11 +3570,12 @@ void Mapper::UpdateStoredPoses()
         pose.x = scan->GetCorrectedPose().GetX();
         pose.y = scan->GetCorrectedPose().GetY();
         pose.yaw = scan->GetCorrectedPose().GetHeading();
-
+#ifdef KARTO_DEBUG
         std::cout << "Updated Stored Pose for scanId: " << pose.scanId
                   << " -> X=" << pose.x
                   << ", Y=" << pose.y
                   << ", Yaw=" << pose.yaw << std::endl;
+#endif
     }
     tableVectorUpdated_ = true;
 }
