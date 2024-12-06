@@ -49,6 +49,8 @@
 #include "slam_toolbox/map_saver.hpp"
 #include "slam_toolbox/loop_closure_assistant.hpp"
 
+#include <std_msgs/msg/float32.hpp> // TODO: change here idk
+
 namespace slam_toolbox
 {
 
@@ -135,6 +137,8 @@ protected:
   std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>> sst_;
   std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::MapMetaData>> sstm_;
   std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>> pose_pub_;
+  std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Float32>> localization_health_pub_; // TODO: Change here
+  std::shared_ptr<rclcpp::Publisher<slam_toolbox::msg::SavedTargetInfoArray>> ssSaved_target_data_;
   std::shared_ptr<rclcpp::Service<nav_msgs::srv::GetMap>> ssMap_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::Pause>> ssPauseMeasurements_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::SerializePoseGraph>> ssSerialize_;
@@ -143,6 +147,7 @@ protected:
   // Storage for ROS parameters
   std::string odom_frame_, map_frame_, base_frame_, map_name_, scan_topic_;
   bool use_map_saver_;
+  bool publish_map_once_, update_map_once_ = true;
   rclcpp::Duration transform_timeout_, minimum_time_interval_;
   std_msgs::msg::Header scan_header;
   int throttle_scans_, scan_queue_size_;
@@ -151,6 +156,16 @@ protected:
   double position_covariance_scale_;
   double yaw_covariance_scale_;
   bool first_measurement_, enable_interactive_mode_;
+
+  // Position search service params
+  double position_search_distance_;
+  double position_search_resolution_;
+  double position_search_smear_deviation_;
+  double position_search_fine_angle_offset_;
+  double position_search_coarse_angle_offset_;
+  double position_search_coarse_angle_resolution_;
+  double position_search_minimum_best_response_;
+  bool position_search_do_relocalization_;
 
   // Book keeping
   std::unique_ptr<mapper_utils::SMapper> smapper_;
@@ -172,6 +187,7 @@ protected:
   nav_msgs::srv::GetMap::Response map_;
   ProcessType processor_type_;
   std::unique_ptr<karto::Pose2> process_near_pose_;
+  std::unique_ptr<karto::Pose2> process_desired_pose_;
   tf2::Transform reprocessing_transform_;
 
   // pluginlib

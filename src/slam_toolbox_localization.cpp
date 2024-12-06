@@ -39,6 +39,11 @@ LocalizationSlamToolbox::LocalizationSlamToolbox(rclcpp::NodeOptions options)
     std::bind(&LocalizationSlamToolbox::clearLocalizationBuffer, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  set_parameters_srv_ = this->create_service<slam_toolbox::srv::SetParametersService>(
+    "slam_toolbox/set_dynamic_parameters",
+    std::bind(&LocalizationSlamToolbox::set_parameters_callback, this,
+    std::placeholders::_1, std::placeholders::_2));
+
   // in localization mode, we cannot allow for interactive mode
   enable_interactive_mode_ = false;
 
@@ -122,6 +127,7 @@ void LocalizationSlamToolbox::laserCallback(
   scan_header = scan->header;
   // no odom info
   Pose2 pose;
+  RCLCPP_INFO(get_logger(), "LocalizationSlamToolbox: Processing scans.");
   if (!pose_helper_->getOdomPose(pose, scan->header.stamp)) {
     RCLCPP_WARN(get_logger(), "Failed to compute odom pose");
     return;
@@ -153,6 +159,9 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
   if (processor_type_ == PROCESS_LOCALIZATION && process_near_pose_) {
     processor_type_ = PROCESS_NEAR_REGION;
   }
+  if (processor_type_ == PROCESS_LOCALIZATION && process_desired_pose_) {
+    processor_type_ = PROCESS_DESIRED_POSE;
+  }
 
   LocalizedRangeScan * range_scan = getLocalizedRangeScan(
     laser, scan, odom_pose);
@@ -172,7 +181,7 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
       return nullptr;
     }
 
-    // set our position to the requested pose and process
+    // set our position to the requested pose and proces
     range_scan->SetOdometricPose(*process_near_pose_);
     range_scan->SetCorrectedPose(range_scan->GetOdometricPose());
     process_near_pose_.reset(nullptr);
@@ -181,28 +190,172 @@ LocalizedRangeScan * LocalizationSlamToolbox::addScan(
     // reset to localization mode
     update_reprocessing_transform = true;
     processor_type_ = PROCESS_LOCALIZATION;
-  } else if (processor_type_ == PROCESS_LOCALIZATION) {
+  }else if (processor_type_ == PROCESS_DESIRED_POSE) {
+    process_desired_pose_.reset(nullptr);
+    processed = true;
+  }else if (processor_type_ == PROCESS_LOCALIZATION) {
     processed = smapper_->getMapper()->ProcessLocalization(range_scan, &covariance);
     update_reprocessing_transform = false;
-  } else {
+  } 
+  else {
     RCLCPP_FATAL(get_logger(), "LocalizationSlamToolbox: "
       "No valid processor type set! Exiting.");
     exit(-1);
   }
 
-  // if successfully processed, create odom to map transformation
   if (!processed) {
     delete range_scan;
     range_scan = nullptr;
-  } else {
-    // compute our new transform
-    setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
-      scan->header.stamp, update_reprocessing_transform);
+  } 
+  else{ 
+    if (processor_type_ != PROCESS_DESIRED_POSE) {
+      setTransformFromPoses(range_scan->GetCorrectedPose(), odom_pose,
+        scan->header.stamp, update_reprocessing_transform);
 
-    publishPose(range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+      publishPose(range_scan->GetCorrectedPose(), covariance, scan->header.stamp);
+    }   
+  }
+  if (processor_type_ == PROCESS_DESIRED_POSE){
+    processor_type_ = PROCESS_LOCALIZATION;
   }
 
   return range_scan;
+}
+/*****************************************************************************/
+void LocalizationSlamToolbox::setInitialParameters(double position_search_distance, double position_search_maximum_distance, double position_search_fine_angle_offset,
+                          double position_search_coarse_angle_offset, double position_search_coarse_angle_resolution, double position_search_resolution, 
+                          double position_search_smear_deviation,bool do_loop_closing_flag,
+                          int scan_buffer_size)
+/*****************************************************************************/          
+{
+  smapper_->getMapper()->setParamLoopSearchSpaceDimension(position_search_distance);
+  smapper_->getMapper()->setParamLoopSearchMaximumDistance(position_search_maximum_distance);
+  smapper_->getMapper()->setParamFineSearchAngleOffset(position_search_fine_angle_offset);
+  smapper_->getMapper()->setParamCoarseSearchAngleOffset(position_search_coarse_angle_offset);
+  smapper_->getMapper()->setParamCoarseAngleResolution(position_search_coarse_angle_resolution);
+  smapper_->getMapper()->setParamLoopSearchSpaceResolution(position_search_resolution);
+  smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(position_search_smear_deviation);
+  smapper_->getMapper()->setParamDoLoopClosing(do_loop_closing_flag);
+  smapper_->getMapper()->setParamScanBufferSize(scan_buffer_size);
+  if(processor_type_ == PROCESS_LOCALIZATION){
+    smapper_->getMapper()->m_Initialized = false;
+  }
+  else{
+    smapper_->getMapper()->GetGraph()->UpdateLoopScanMatcher(this->get_parameter("max_laser_range").as_double());
+  }
+}
+
+
+/*****************************************************************************/
+void LocalizationSlamToolbox::set_parameters_callback(
+    const std::shared_ptr<slam_toolbox::srv::SetParametersService::Request> request,
+    std::shared_ptr<slam_toolbox::srv::SetParametersService::Response> response
+) 
+/*****************************************************************************/
+{
+    if(request->table_save_mode){
+      if (processor_type_ == PROCESS){
+        if (request->target_uid.empty()){
+          RCLCPP_ERROR(get_logger(), "Triggering target save without target name or type");
+          response->success = false;
+          response->message = "There is no target name! Please provide a target name.";
+          return;
+        }
+        else{
+          RCLCPP_INFO(get_logger(), "Triggering target save function");
+          boost::mutex::scoped_lock lock(smapper_mutex_);
+          smapper_->getMapper()->StartTableStorage(true,request->target_uid);
+        } 
+      }
+    }
+
+    if(request->target_list_off){
+      if (processor_type_ == PROCESS){
+        boost::mutex::scoped_lock lock(smapper_mutex_);
+        smapper_->getMapper()->tableVectorUpdated_= true;
+      }
+    }
+
+    if (request->default_mode) {
+        RCLCPP_INFO(get_logger(), "Setting parameters for the default mode");
+        boost::mutex::scoped_lock lock(smapper_mutex_);
+        setInitialParameters(
+            this->get_parameter("loop_search_space_dimension").as_double(),
+            this->get_parameter("loop_search_maximum_distance").as_double(), 
+            this->get_parameter("fine_search_angle_offset").as_double(),
+            this->get_parameter("coarse_search_angle_offset").as_double(),
+            this->get_parameter("coarse_angle_resolution").as_double(),
+            this->get_parameter("loop_search_space_resolution").as_double(),
+            this->get_parameter("loop_search_space_smear_deviation").as_double(),
+            this->get_parameter("do_loop_closing").as_bool(),
+            this->get_parameter("scan_buffer_size").as_int()
+        );
+
+        response->success = true;
+        response->message = "Default parameters set successfully.";
+        return;
+    } 
+
+    if (request->param_names.size() != request->param_values.size()) {
+        response->success = false;
+        response->message = "Mismatched param_names and param_values lengths.";
+        return;
+    }
+
+    boost::mutex::scoped_lock lock(smapper_mutex_);
+    // main purpose is resetting all the parameters first call. then initialize.
+    setInitialParameters(
+        this->get_parameter("loop_search_space_dimension").as_double(),
+        this->get_parameter("loop_search_maximum_distance").as_double(), 
+        this->get_parameter("fine_search_angle_offset").as_double(),
+        this->get_parameter("coarse_search_angle_offset").as_double(),
+        this->get_parameter("coarse_angle_resolution").as_double(),
+        this->get_parameter("loop_search_space_resolution").as_double(),
+        this->get_parameter("loop_search_space_smear_deviation").as_double(),
+        this->get_parameter("do_loop_closing").as_bool(),
+        this->get_parameter("scan_buffer_size").as_int()
+    );
+
+    for (size_t i = 0; i < request->param_names.size(); ++i) {
+        const auto &param_name = request->param_names[i];
+        const auto &param_value = request->param_values[i];
+
+        if (param_name == "loop_search_maximum_distance") {
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
+        } 
+        else if (param_name == "loop_search_space_dimension") {
+            smapper_->getMapper()->setParamLoopSearchSpaceDimension(param_value);
+        } 
+        else if (param_name == "loop_search_space_resolution"){
+            smapper_->getMapper()->setParamLoopSearchSpaceResolution(param_value);
+        }
+        else if (param_name == "loop_search_space_smear_deviation"){
+            smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(param_value);
+        }
+        else if (param_name == "loop_search_maximum_distance"){
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param_value);
+        }
+        else if (param_name == "correlation_search_space_dimension"){
+            smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(param_value);
+        }
+        else if (param_name == "scan_buffer_size"){
+            int value =static_cast<int>(param_value);
+            smapper_->getMapper()->setParamScanBufferSize(value);        
+        }
+        else {
+            RCLCPP_ERROR(get_logger(),
+              "Parameter not recognized. Returning false");
+        }
+    }
+
+    if(processor_type_ == PROCESS_LOCALIZATION){
+      smapper_->getMapper()->m_Initialized = false;
+    }
+    else{
+      smapper_->getMapper()->GetGraph()->UpdateLoopScanMatcher(this->get_parameter("max_laser_range").as_double());
+    }
+    response->success = true;
+    response->message = "Parameters set successfully for the specified mode";
 }
 
 /*****************************************************************************/
