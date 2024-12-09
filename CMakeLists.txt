@@ -106,6 +106,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   srvs/AddSubmap.srv
   srvs/DeserializePoseGraph.srv
   srvs/SerializePoseGraph.srv
+  msgs/SlamMetrics.msg
   srvs/SetParametersService.srv
   msgs/SavedTargetInfo.msg
   msgs/SavedTargetInfoArray.msg

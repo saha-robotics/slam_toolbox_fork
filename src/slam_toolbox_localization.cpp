@@ -253,7 +253,7 @@ void LocalizationSlamToolbox::set_parameters_callback(
 ) 
 /*****************************************************************************/
 {
-    if(request->table_save_mode){
+    if(request->target_save_mode){
       if (processor_type_ == PROCESS){
         if (request->target_uid.empty()){
           RCLCPP_ERROR(get_logger(), "Triggering target save without target name or type");
