@@ -80,6 +80,14 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
 
     // in localization mode, disable map saver
     map_saver_.reset();
+
+    sst_.reset();
+    sstm_.reset();
+    sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+      map_name_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
+      map_name_ + "_metadata",
+      rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
     
   }
   else {
@@ -94,6 +102,16 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
     if (smapper_ && !smapper_->getMapper()->GetLocalizationVertices().empty()) {
       smapper_->clearLocalizationBuffer();
     }
+
+    sst_.reset();
+    sstm_.reset();
+    std::string map_name = std::string("map");
+    sst_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+      map_name, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    sstm_ = this->create_publisher<nav_msgs::msg::MapMetaData>(
+      map_name + "_metadata",
+      rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+
   }
 }
 
@@ -106,7 +124,7 @@ void MapAndLocalizationSlamToolbox::loadPoseGraphByParams()
   }
   else {
     SlamToolbox::loadPoseGraphByParams();
-    changeMapTopic(map_name_);
+    // changeMapTopic(map_name_);
   }
 }
 

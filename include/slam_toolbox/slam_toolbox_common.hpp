@@ -49,9 +49,7 @@
 #include "slam_toolbox/map_saver.hpp"
 #include "slam_toolbox/loop_closure_assistant.hpp"
 #include "slam_toolbox/msg/slam_metrics.hpp"
-
-#include <std_msgs/msg/float32.hpp> // TODO: change here idk
-
+#include "slam_toolbox/srv/reset.hpp"
 namespace slam_toolbox
 {
 
@@ -92,7 +90,10 @@ protected:
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<slam_toolbox::srv::DeserializePoseGraph::Request> req,
     std::shared_ptr<slam_toolbox::srv::DeserializePoseGraph::Response> resp);
-
+  virtual bool resetCallback(
+    const std::shared_ptr<rmw_request_id_t> request_header,
+    const std::shared_ptr<slam_toolbox::srv::Reset::Request> req,
+    std::shared_ptr<slam_toolbox::srv::Reset::Response> resp);
   // Loaders
   void loadSerializedPoseGraph(std::unique_ptr<karto::Mapper> &, std::unique_ptr<karto::Dataset> &);
 
@@ -144,6 +145,7 @@ protected:
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::Pause>> ssPauseMeasurements_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::SerializePoseGraph>> ssSerialize_;
   std::shared_ptr<rclcpp::Service<slam_toolbox::srv::DeserializePoseGraph>> ssDesserialize_;
+  std::shared_ptr<rclcpp::Service<slam_toolbox::srv::Reset>> ssReset_;
 
   // Storage for ROS parameters
   std::string odom_frame_, map_frame_, base_frame_, map_name_, scan_topic_;

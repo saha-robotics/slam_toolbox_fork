@@ -271,6 +271,10 @@ void SlamToolbox::setROSInterfaces()
     "slam_toolbox/deserialize_map",
     std::bind(&SlamToolbox::deserializePoseGraphCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+  ssReset_ = this->create_service<slam_toolbox::srv::Reset>(
+    "slam_toolbox/reset",
+    std::bind(&SlamToolbox::resetCallback, this,
+    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
   ssSaved_target_data_ = this->create_publisher<slam_toolbox::msg::SavedTargetInfoArray>(
     "slam_toolbox/saved_target_data", qos);
@@ -933,6 +937,34 @@ bool SlamToolbox::deserializePoseGraphCallback(
         "Deserialization called without valid processor type set.");
   }
 
+  return true;
+}
+
+/*****************************************************************************/
+bool SlamToolbox::resetCallback(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std::shared_ptr<slam_toolbox::srv::Reset::Request> req,
+  std::shared_ptr<slam_toolbox::srv::Reset::Response> resp)
+/*****************************************************************************/
+{
+  boost::mutex::scoped_lock lock(smapper_mutex_);
+  // Reset the map.
+  smapper_->Reset();
+  smapper_->getMapper()->getScanSolver()->Reset();
+
+  // Ensure we will process the next available scan.
+  first_measurement_ = true;
+
+  reprocessing_transform_ = tf2::Transform::getIdentity();
+  // Pause new measurements processing if requested.
+  if (req->pause_new_measurements) {
+    state_.set(NEW_MEASUREMENTS, true);
+    this->set_parameter({"paused_new_measurements", true});
+    RCLCPP_INFO(get_logger(),
+      "SlamToolbox: Toggled to pause taking new measurements after reset.");
+  }
+  
+  resp->result = resp->RESULT_SUCCESS;
   return true;
 }
 
