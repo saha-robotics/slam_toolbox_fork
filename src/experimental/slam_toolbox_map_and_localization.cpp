@@ -124,7 +124,7 @@ void MapAndLocalizationSlamToolbox::loadPoseGraphByParams()
   }
   else {
     SlamToolbox::loadPoseGraphByParams();
-    changeMapTopic(map_name_);
+    // changeMapTopic(map_name_);
   }
 }
 
