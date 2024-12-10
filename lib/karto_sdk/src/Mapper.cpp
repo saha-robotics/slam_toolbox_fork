@@ -48,6 +48,7 @@ namespace karto
 
 // enable this for verbose debug information
 // #define KARTO_DEBUG
+// #define KARTO_DEBUG2
 
   #define MAX_VARIANCE            500.0
   #define DISTANCE_PENALTY_GAIN   0.2
@@ -1298,6 +1299,9 @@ public:
     {
       objects.push_back((*iter)->GetObject());
     }
+#ifdef KARTO_DEBUG2
+    std::cout << "objects size: " << objects.size() << std::endl; 
+#endif
 
     return objects;
   }
@@ -1512,6 +1516,9 @@ void MapperGraph::AddEdges(LocalizedRangeScan * pScan, const Matrix3 & rCovarian
       if ((rCandidateSensorName == rSensorName) ||
         (pSensorManager->GetScans(rCandidateSensorName).empty()))
       {
+#ifdef KARTO_DEBUG2
+        std::cout << "Skipping candidate sensor name: " << rCandidateSensorName << std::endl;
+#endif
         continue;
       }
 
@@ -1538,6 +1545,9 @@ void MapperGraph::AddEdges(LocalizedRangeScan * pScan, const Matrix3 & rCovarian
   }
 
   // link to other near chains (chains that include new scan are invalid)
+#ifdef KARTO_DEBUG2
+  std::cout << "Linking to other near chains" << std::endl;
+#endif
   LinkNearChains(pScan, means, covariances);
 
   if (!means.empty()) {
@@ -1553,10 +1563,9 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
 
   LocalizedRangeScanVector candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
 
-#ifdef KARTO_DEBUG
+#ifdef KARTO_DEBUG2
   std::cout << "TryCloseLoop candidateChain size: " << candidateChain.size() << std::endl;
 #endif
-
   while (!candidateChain.empty()) {
 #ifdef KARTO_DEBUG
     std::cout << "Checking of the candidatecChainsize inside of Loop CLosure: " << candidateChain.size() << std::endl;
@@ -1856,6 +1865,9 @@ std::vector<LocalizedRangeScanVector> MapperGraph::FindNearChains(LocalizedRange
 
   const LocalizedRangeScanVector nearLinkedScans = FindNearLinkedScans(pScan,
       m_pMapper->m_pLinkScanMaximumDistance->GetValue());
+#ifdef KARTO_DEBUG2
+  std::cout << "FindNearChains0 : nearLinkedScans.size() : " << nearLinkedScans.size() << std::endl;
+#endif
   const_forEach(LocalizedRangeScanVector, &nearLinkedScans)
   {
     LocalizedRangeScan * pNearScan = *iter;
@@ -1909,7 +1921,9 @@ std::vector<LocalizedRangeScanVector> MapperGraph::FindNearChains(LocalizedRange
     }
 
     chain.push_back(pNearScan);
-
+#ifdef KARTO_DEBUG2
+        std::cout << "FindNearChains : chain.size() : " << chain.size() << std::endl;
+#endif
     // add scans after current scan being processed
     kt_int32u end =
       static_cast<kt_int32u>(m_pMapper->m_pMapperSensorManager->GetScans(
@@ -1952,6 +1966,10 @@ std::vector<LocalizedRangeScanVector> MapperGraph::FindNearChains(LocalizedRange
       // add chain to collection
       nearChains.push_back(tempChain);
     }
+#ifdef KARTO_DEBUG2
+        std::cout << "FindNearChains2 : chain.size() : " << nearChains.size() << std::endl;
+#endif
+  m_pMapper->m_pnearChainsCount = std::make_shared<int>(nearChains.size());  
   }
 
   return nearChains;
@@ -1965,6 +1983,9 @@ LocalizedRangeScanVector MapperGraph::FindNearLinkedScans(
       m_pMapper->m_pUseScanBarycenter->GetValue());
   LocalizedRangeScanVector nearLinkedScans = m_pTraversal->TraverseForScans(GetVertex(
         pScan), pVisitor);
+#ifdef KARTO_DEBUG2
+  std::cout << "FindNearLinkedScans : nearLinkedScans.size() : " << nearLinkedScans.size() << std::endl;
+#endif
   delete pVisitor;
 
   return nearLinkedScans;
@@ -2137,6 +2158,10 @@ LocalizedRangeScanVector MapperGraph::FindPossibleLoopClosure(
   const LocalizedRangeScanVector nearLinkedScans =
     FindNearLinkedScans(pScan, m_pMapper->m_pLoopSearchMaximumDistance->GetValue());
 
+#ifdef KARTO_DEBUG2
+  std::cout << "FindPossibleLoopClosure0 : nearLinkedScans.size() : " << nearLinkedScans.size() << std::endl;
+#endif
+
   kt_int32u nScans =
     static_cast<kt_int32u>(m_pMapper->m_pMapperSensorManager->GetScans(rSensorName).size());
 
@@ -2246,7 +2271,8 @@ Mapper::Mapper()
   m_pScanOptimizer(NULL),
   m_pbestResponse(std::make_shared<double>(0.0)),
   m_pbestPoseX(std::make_shared<double>(0.0)),     
-  m_pbestPoseY(std::make_shared<double>(0.0)) 
+  m_pbestPoseY(std::make_shared<double>(0.0)),
+  m_pnearChainsCount(std::make_shared<int>(0))
 {
   InitializeParameters();
 }
@@ -2264,7 +2290,8 @@ Mapper::Mapper(const std::string & rName)
   m_pScanOptimizer(NULL),
   m_pbestResponse(std::make_shared<double>(0.0)),
   m_pbestPoseX(std::make_shared<double>(0.0)),     
-  m_pbestPoseY(std::make_shared<double>(0.0)) 
+  m_pbestPoseY(std::make_shared<double>(0.0)),
+  m_pnearChainsCount(std::make_shared<int>(0))
 {
   InitializeParameters();
 }
@@ -3080,7 +3107,7 @@ kt_bool Mapper::ProcessAgainstNodesNearBy(LocalizedRangeScan * pScan, kt_bool ad
 
 kt_bool Mapper::ProcessLocalization(LocalizedRangeScan * pScan, Matrix3 * covariance)
 {
-  
+
   if (pScan == NULL) {
     return false;
   }
@@ -3521,6 +3548,7 @@ std::shared_ptr<Mapper::LocalizationInfos> Mapper::GetBestResponse() const
     response->bestResponse = *m_pbestResponse;
     response->bestPoseX = *m_pbestPoseX;
     response->bestPoseY = *m_pbestPoseY;
+    response->nearChainsCount = *m_pnearChainsCount;
     return response;
 }
 
