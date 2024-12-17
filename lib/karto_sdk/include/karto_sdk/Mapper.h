@@ -2397,6 +2397,13 @@ protected:
   // whether to increase the search space if no good matches are initially found
   Parameter<kt_bool> * m_pUseResponseExpansion;
 
+  // Number of beams that must pass through a cell before it will be considered to be occupied 
+  // or unoccupied.  This prevents stray beams from messing up the map. 
+  Parameter<kt_int32u> * m_pMinPassThrough;
+
+  // Minimum ratio of beams hitting cell to beams passing through cell to be marked as occupied
+  Parameter<kt_double> * m_pOccupancyThreshold;
+
   friend class boost::serialization::access;
   template<class Archive>
   void serialize(Archive & ar, const unsigned int version)
@@ -2484,7 +2491,9 @@ public:
   double getParamMinimumAnglePenalty();
   double getParamMinimumDistancePenalty();
   bool getParamUseResponseExpansion();
-
+  int getParamMinPassThrough();
+  double getParamOccupancyThreshold();  
+  
   /* Setters */
   // General Parameters
   void setParamUseScanMatching(bool b);
@@ -2522,6 +2531,8 @@ public:
   void setParamMinimumAnglePenalty(double d);
   void setParamMinimumDistancePenalty(double d);
   void setParamUseResponseExpansion(bool b);
+  void setParamMinPassThrough(int i);
+  void setParamOccupancyThreshold(double d);
 };
 BOOST_SERIALIZATION_ASSUME_ABSTRACT(Mapper)
 }  // namespace karto

@@ -4912,12 +4912,33 @@ public:
         y += ystep;
         error -= deltaX;
       }
-
+      //TODO(Baha) : this pGridPointer only increase the passcnt value in the passed grids
       Vector2<kt_int32s> gridIndex(pointX, pointY);
       if (IsValidGridIndex(gridIndex)) {
         kt_int32s index = GridIndex(gridIndex, false);
         T * pGridPointer = GetDataPointer();
-        pGridPointer[index]++;
+
+        kt_double resolution = GetResolution();
+
+        int dx = abs(x1 - x0);
+        int dy = abs(y1 - y0);
+
+        kt_double distanceX = dx * resolution;
+        kt_double distanceY = dy * resolution;
+
+        kt_double euclideanDistance = sqrt(distanceX * distanceX + distanceY * distanceY);
+
+        if (euclideanDistance < 10.0) {
+          // std::cout << "\n\nDistanceX: " << distanceX << ", DistanceY: " << distanceY << std::endl;
+          // std::cout << "Euclidean Distance: " << euclideanDistance << std::endl;
+          // std::cout << "gridX" << x0 << "gridY" << y0 << std::endl;
+          // std::cout << "gridX" << x1 << "gridY" << y1 << std::endl;
+          pGridPointer[index] += 2;
+        }
+        else {
+          pGridPointer[index]++;
+        }
+        
 
         if (f != NULL) {
           (*f)(index);
@@ -5939,6 +5960,8 @@ public:
   }
 
 public:
+
+  /* TODO:Baha CHeck here*/
   /**
    * Create an occupancy grid from the given scans using the given resolution
    * @param rScans
@@ -5946,7 +5969,7 @@ public:
    */
   static OccupancyGrid * CreateFromScans(
     const LocalizedRangeScanVector & rScans,
-    kt_double resolution)
+    kt_double resolution, kt_int32u min_pass_through, kt_double occupancy_threshold)
   {
     if (rScans.empty()) {
       return NULL;
@@ -5956,6 +5979,8 @@ public:
     Vector2<kt_double> offset;
     ComputeDimensions(rScans, resolution, width, height, offset);
     OccupancyGrid * pOccupancyGrid = new OccupancyGrid(width, height, offset, resolution);
+    pOccupancyGrid->SetMinPassThrough(min_pass_through); 
+    pOccupancyGrid->SetOccupancyThreshold(occupancy_threshold);
     pOccupancyGrid->CreateFromScans(rScans);
 
     return pOccupancyGrid;
@@ -6038,6 +6063,7 @@ public:
     return (distance < maxRange) ? distance : maxRange;
   }
 
+  //TODO: Baha check beams grid
   /**
    * Sets the minimum number of beams that must pass through a cell before it
    * will be considered to be occupied or unoccupied.
@@ -6221,8 +6247,9 @@ protected:
         kt_int32u * pCellHitCntPtr = m_pCellHitsCnt->GetDataPointer();
 
         // increment cell pass through and hit count
+        // TODO(Baha) If you increment from here it will be update only the end point not the path way.
         pCellPassCntPtr[index]++;
-        pCellHitCntPtr[index]++;
+        pCellHitCntPtr[index] += 2;
 
         if (doUpdate) {
           (*m_pCellUpdater)(index);
@@ -6232,7 +6259,7 @@ protected:
 
     return m_pCellPassCnt->IsValidGridIndex(gridTo);
   }
-
+  // TODO(Baha): updatecell
   /**
    * Updates a single cell's value based on the given counters
    * @param pCell
@@ -6269,7 +6296,17 @@ protected:
 
     kt_int32u nBytes = GetDataSize();
     for (kt_int32u i = 0; i < nBytes; i++, pDataPtr++, pCellPassCntPtr++, pCellHitCntPtr++) {
+      
+      kt_int32u oldPassCnt = *pCellPassCntPtr;
+      kt_int32u oldHitCnt = *pCellHitCntPtr;
+
       UpdateCell(pDataPtr, *pCellPassCntPtr, *pCellHitCntPtr);
+
+      if (*pCellPassCntPtr != oldPassCnt || *pCellHitCntPtr != oldHitCnt) {
+          std::cout << "Iteration: " << i << std::endl;
+          std::cout << "Old PassCnt: " << oldPassCnt << ", New PassCnt: " << *pCellPassCntPtr << std::endl;
+          std::cout << "Old HitCnt: " << oldHitCnt << ", New HitCnt: " << *pCellHitCntPtr << std::endl;
+      }
     }
   }
 
@@ -6285,6 +6322,7 @@ protected:
     m_pCellHitsCnt->Resize(width, height);
   }
 
+// TODO: Baha check here
 protected:
   /**
    * Counters of number of times a beam passed through a cell

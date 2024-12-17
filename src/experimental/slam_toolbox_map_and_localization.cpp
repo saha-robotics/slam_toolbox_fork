@@ -90,7 +90,7 @@ void MapAndLocalizationSlamToolbox::toggleMode(bool enable_localization) {
     map_saver_ = std::make_unique<map_saver::MapSaver>(shared_from_this(), map_name_);
     changeMapTopic(std::string("map"));
     boost::mutex::scoped_lock lock(smapper_mutex_);
-    publish_map_once_ = false;
+    // publish_map_once_ = false;
     if (smapper_ && !smapper_->getMapper()->GetLocalizationVertices().empty()) {
       smapper_->clearLocalizationBuffer();
     }
