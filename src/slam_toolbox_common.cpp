@@ -272,6 +272,9 @@ void SlamToolbox::setROSInterfaces()
     std::bind(&SlamToolbox::deserializePoseGraphCallback, this,
     std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+  callback_handle_ = this->add_on_set_parameters_callback(
+    std::bind(&SlamToolbox::parametersCallback, this, std::placeholders::_1));
+
   ssSaved_target_data_ = this->create_publisher<slam_toolbox::msg::SavedTargetInfoArray>(
     "slam_toolbox/saved_target_data", qos);
 
@@ -934,6 +937,49 @@ bool SlamToolbox::deserializePoseGraphCallback(
   }
 
   return true;
+}
+
+/*****************************************************************************/
+rcl_interfaces::msg::SetParametersResult SlamToolbox::parametersCallback(
+    const std::vector<rclcpp::Parameter> &parameters)
+{
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    result.reason = "success";
+    for (const auto &param: parameters)
+    {
+        std::string param_name = param.get_name();
+        boost::mutex::scoped_lock lock(smapper_mutex_);
+        if (param_name == "loop_search_maximum_distance") {
+            smapper_->getMapper()->setParamLoopSearchMaximumDistance(param.as_double());
+            RCLCPP_INFO(get_logger(), "Set loop_search_maximum_distance to %f", param.as_double());
+        } 
+        else if (param_name == "loop_search_space_dimension") {
+            smapper_->getMapper()->setParamLoopSearchSpaceDimension(param.as_double());
+            RCLCPP_INFO(get_logger(), "Set loop_search_space_dimension to %f", param.as_double());
+        } 
+        else if (param_name == "loop_search_space_resolution"){
+            smapper_->getMapper()->setParamLoopSearchSpaceResolution(param.as_double());
+            RCLCPP_INFO(get_logger(), "Set loop_search_space_resolution to %f", param.as_double());
+        }
+        else if (param_name == "loop_search_space_smear_deviation"){
+            smapper_->getMapper()->setParamLoopSearchSpaceSmearDeviation(param.as_double());
+            RCLCPP_INFO(get_logger(), "Set loop_search_space_smear_deviation to %f", param.as_double());
+        }
+        else if (param_name == "correlation_search_space_dimension"){
+            smapper_->getMapper()->setParamCorrelationSearchSpaceDimension(param.as_double());
+            RCLCPP_INFO(get_logger(), "Set correlation_search_space_dimension to %f", param.as_double());
+        }
+        else if (param_name == "scan_buffer_size"){
+            smapper_->getMapper()->setParamScanBufferSize(param.as_int());      
+            RCLCPP_INFO(get_logger(), "Set scan_buffer_size to %d", param.as_int());
+        }
+        else {
+            RCLCPP_ERROR(get_logger(),
+              "Parameter not recognized. Returning false");
+        }
+    }
+    return result;
 }
 
 }  // namespace slam_toolbox
