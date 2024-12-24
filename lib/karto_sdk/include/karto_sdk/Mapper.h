@@ -2404,6 +2404,13 @@ protected:
   // Minimum ratio of beams hitting cell to beams passing through cell to be marked as occupied
   Parameter<kt_double> * m_pOccupancyThreshold;
 
+  // Maksimum range of attached base_link to the increased unoccupied coefficient 
+  // for passed grids in the grid map which is those added Scan datas. 
+  Parameter<kt_double> * m_pScaleUpFreeCellRadius;
+
+  // coefficient value for the m_pFreeCellRadius
+  Parameter<kt_int32u> * m_pFreeCellCoefficient;
+
   friend class boost::serialization::access;
   template<class Archive>
   void serialize(Archive & ar, const unsigned int version)
@@ -2493,6 +2500,8 @@ public:
   bool getParamUseResponseExpansion();
   int getParamMinPassThrough();
   double getParamOccupancyThreshold();  
+  double getParamScaleUpFreeCellRadius();
+  int getParamFreeCellCoefficient();
   
   /* Setters */
   // General Parameters
@@ -2533,6 +2542,8 @@ public:
   void setParamUseResponseExpansion(bool b);
   void setParamMinPassThrough(int i);
   void setParamOccupancyThreshold(double d);
+  void setParamScaleUpFreeCellRadius(double d);
+  void setParamFreeCellCoefficient(int i);
 };
 BOOST_SERIALIZATION_ASSUME_ABSTRACT(Mapper)
 }  // namespace karto

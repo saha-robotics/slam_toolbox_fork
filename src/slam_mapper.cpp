@@ -66,7 +66,9 @@ karto::OccupancyGrid * SMapper::getOccupancyGrid(const double & resolution)
   karto::OccupancyGrid * occ_grid = nullptr;
   return karto::OccupancyGrid::CreateFromScans(
     mapper_->GetAllProcessedScans(),
-    resolution, (kt_int32u)mapper_->getParamMinPassThrough(), (kt_double)mapper_->getParamOccupancyThreshold());
+    resolution, 
+    (kt_int32u)mapper_->getParamMinPassThrough(), (kt_double)mapper_->getParamOccupancyThreshold(), 
+    (kt_double)mapper_->getParamScaleUpFreeCellRadius(), (kt_int32u)mapper_->getParamFreeCellCoefficient());
 }
 
 /*****************************************************************************/
@@ -362,12 +364,27 @@ void SMapper::configure(const rclcpp::Node::SharedPtr & node)
   node->get_parameter("min_pass_through", min_pass_through);
   mapper_->setParamMinPassThrough(min_pass_through);
 
-  double occupancy_threshold = 0.1;
+  double occupancy_threshold = 0.16;
   if (!node->has_parameter("occupancy_threshold")) {
     node->declare_parameter("occupancy_threshold", occupancy_threshold);
   }
   node->get_parameter("occupancy_threshold", occupancy_threshold);
   mapper_->setParamOccupancyThreshold(occupancy_threshold);
+
+  double scale_up_free_cell_radius = 0.18;
+  if (!node->has_parameter("scale_up_free_cell_radius")) {
+    node->declare_parameter("scale_up_free_cell_radius", scale_up_free_cell_radius);
+  }
+  node->get_parameter("scale_up_free_cell_radius", scale_up_free_cell_radius);
+  mapper_->setParamScaleUpFreeCellRadius(scale_up_free_cell_radius);
+
+  int free_cell_coefficient = 2;
+  if (!node->has_parameter("free_cell_coefficient")) {
+    node->declare_parameter("free_cell_coefficient", free_cell_coefficient);
+  }
+  node->get_parameter("free_cell_coefficient", free_cell_coefficient);
+  mapper_->setParamFreeCellCoefficient(free_cell_coefficient);
+  
 }
 
 /*****************************************************************************/

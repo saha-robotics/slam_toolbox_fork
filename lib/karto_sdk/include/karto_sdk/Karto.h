@@ -4680,6 +4680,7 @@ public:
    */
   virtual kt_int32s GridIndex(const Vector2<kt_int32s> & rGrid, kt_bool boundaryCheck = true) const
   {
+    //TODO(baha) : GridIndex
     if (boundaryCheck == true) {
       if (IsValidGridIndex(rGrid) == false) {
         std::stringstream error;
@@ -4871,7 +4872,7 @@ public:
    * @param y1
    * @param f
    */
-  void TraceLine(kt_int32s x0, kt_int32s y0, kt_int32s x1, kt_int32s y1, Functor * f = NULL)
+  void TraceLine(kt_int32s x0, kt_int32s y0, kt_int32s x1, kt_int32s y1, kt_double scaled_up_range, kt_int32s pass_coefficient, Functor * f = NULL)
   {
     kt_bool steep = abs(y1 - y0) > abs(x1 - x0);
     if (steep) {
@@ -4912,7 +4913,7 @@ public:
         y += ystep;
         error -= deltaX;
       }
-      //TODO(Baha) : this pGridPointer only increase the passcnt value in the passed grids
+      //TODO(Baha) : Its adding passcnt in the passed index which is not detected
       Vector2<kt_int32s> gridIndex(pointX, pointY);
       if (IsValidGridIndex(gridIndex)) {
         kt_int32s index = GridIndex(gridIndex, false);
@@ -4926,14 +4927,10 @@ public:
         kt_double distanceX = dx * resolution;
         kt_double distanceY = dy * resolution;
 
-        kt_double euclideanDistance = sqrt(distanceX * distanceX + distanceY * distanceY);
+        kt_double radius = sqrt(distanceX * distanceX + distanceY * distanceY);
 
-        if (euclideanDistance < 10.0) {
-          // std::cout << "\n\nDistanceX: " << distanceX << ", DistanceY: " << distanceY << std::endl;
-          // std::cout << "Euclidean Distance: " << euclideanDistance << std::endl;
-          // std::cout << "gridX" << x0 << "gridY" << y0 << std::endl;
-          // std::cout << "gridX" << x1 << "gridY" << y1 << std::endl;
-          pGridPointer[index] += 2;
+        if (radius < scaled_up_range) {
+          pGridPointer[index] += pass_coefficient;
         }
         else {
           pGridPointer[index]++;
@@ -5659,6 +5656,7 @@ public:
 
 private:
   /**
+   * TODO(Baha): check pLasersettings
    * Compute point readings based on range readings
    * Only range readings within [minimum range; range threshold] are returned
    */
@@ -5937,9 +5935,11 @@ public:
     if (karto::math::DoubleEqual(resolution, 0.0)) {
       throw Exception("Resolution cannot be 0");
     }
-
+    //TODO(Baha) settings of occupancy and minpass and free cell radius range
     m_pMinPassThrough = new Parameter<kt_int32u>("MinPassThrough", 2);
-    m_pOccupancyThreshold = new Parameter<kt_double>("OccupancyThreshold", 0.1);
+    m_pOccupancyThreshold = new Parameter<kt_double>("OccupancyThreshold", 0.16);
+    m_pScaleUpFreeCellRadius = new Parameter<kt_double>("ScaleUpFreeCellRadius", 1.8);
+    m_pFreeCellCoefficient = new Parameter<kt_int32u>("FreeCellCoefficient", 2);
 
     GetCoordinateConverter()->SetScale(1.0 / resolution);
     GetCoordinateConverter()->SetOffset(rOffset);
@@ -5957,6 +5957,9 @@ public:
 
     delete m_pMinPassThrough;
     delete m_pOccupancyThreshold;
+
+    delete m_pScaleUpFreeCellRadius;
+    delete m_pFreeCellCoefficient;
   }
 
 public:
@@ -5969,7 +5972,7 @@ public:
    */
   static OccupancyGrid * CreateFromScans(
     const LocalizedRangeScanVector & rScans,
-    kt_double resolution, kt_int32u min_pass_through, kt_double occupancy_threshold)
+    kt_double resolution, kt_int32u min_pass_through, kt_double occupancy_threshold,kt_double scale_up_free_cell_radius, kt_int32u free_cell_coefficient)
   {
     if (rScans.empty()) {
       return NULL;
@@ -5982,6 +5985,8 @@ public:
     pOccupancyGrid->SetMinPassThrough(min_pass_through); 
     pOccupancyGrid->SetOccupancyThreshold(occupancy_threshold);
     pOccupancyGrid->CreateFromScans(rScans);
+    pOccupancyGrid->SetScaleUpFreeCellRadius(scale_up_free_cell_radius);
+    pOccupancyGrid->SetFreeCellCoefficient(free_cell_coefficient);
 
     return pOccupancyGrid;
   }
@@ -6081,6 +6086,23 @@ public:
   void SetOccupancyThreshold(kt_double thresh)
   {
     m_pOccupancyThreshold->SetValue(thresh);
+  }
+
+  /**
+   * Sets the radius of the circle around a base_link that will be marked as coefficiented free cell
+   * if no obstacles are found within that radius.
+   */
+  void SetScaleUpFreeCellRadius(kt_double radius)
+  {
+    m_pScaleUpFreeCellRadius->SetValue(radius);
+  }
+
+  /**
+   * Sets the coefficient of the free cell
+   */
+  void SetFreeCellCoefficient(kt_int32u coeff)
+  {
+    m_pFreeCellCoefficient->SetValue(coeff);
   }
 
 protected:
@@ -6192,6 +6214,7 @@ protected:
 
       if (rangeReading <= minRange || rangeReading >= maxRange || std::isnan(rangeReading)) {
         // ignore these readings
+        // TODO(Baha) inf values can be used for mapping in here.
         pointIndex++;
         continue;
       } else if (rangeReading >= rangeThreshold) {
@@ -6236,7 +6259,7 @@ protected:
 
     CellUpdater * pCellUpdater = doUpdate ? m_pCellUpdater : NULL;
     m_pCellPassCnt->TraceLine(gridFrom.GetX(), gridFrom.GetY(), gridTo.GetX(),
-      gridTo.GetY(), pCellUpdater);
+      gridTo.GetY(), m_pScaleUpFreeCellRadius->GetValue(), m_pFreeCellCoefficient->GetValue());
 
     // for the end point
     if (isEndPointValid) {
@@ -6249,7 +6272,7 @@ protected:
         // increment cell pass through and hit count
         // TODO(Baha) If you increment from here it will be update only the end point not the path way.
         pCellPassCntPtr[index]++;
-        pCellHitCntPtr[index] += 2;
+        pCellHitCntPtr[index]++;
 
         if (doUpdate) {
           (*m_pCellUpdater)(index);
@@ -6296,17 +6319,8 @@ protected:
 
     kt_int32u nBytes = GetDataSize();
     for (kt_int32u i = 0; i < nBytes; i++, pDataPtr++, pCellPassCntPtr++, pCellHitCntPtr++) {
-      
-      kt_int32u oldPassCnt = *pCellPassCntPtr;
-      kt_int32u oldHitCnt = *pCellHitCntPtr;
-
       UpdateCell(pDataPtr, *pCellPassCntPtr, *pCellHitCntPtr);
 
-      if (*pCellPassCntPtr != oldPassCnt || *pCellHitCntPtr != oldHitCnt) {
-          std::cout << "Iteration: " << i << std::endl;
-          std::cout << "Old PassCnt: " << oldPassCnt << ", New PassCnt: " << *pCellPassCntPtr << std::endl;
-          std::cout << "Old HitCnt: " << oldHitCnt << ", New HitCnt: " << *pCellHitCntPtr << std::endl;
-      }
     }
   }
 
@@ -6358,6 +6372,14 @@ private:
 
   // Minimum ratio of beams hitting cell to beams passing through cell to be marked as occupied
   Parameter<kt_double> * m_pOccupancyThreshold;
+
+  // Maksimum range of attached base_link to the increased unoccupied coefficient 
+  // for passed grids in the grid map which is those added Scan datas. 
+  Parameter<kt_double> * m_pScaleUpFreeCellRadius;
+
+  // coefficient value for the m_pScaleUpFreeCellRadius
+  Parameter<kt_int32u> * m_pFreeCellCoefficient;
+
 };    // OccupancyGrid
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -6903,7 +6925,8 @@ private:
     const_forEach(Pose2Vector, &rLocalPoints)
     {
       const Vector2<kt_double> & rPosition = iter->GetPosition();
-
+      // TODO(baha) regarding the inf and nan values in here.
+      // if those index needed also do remove from here.
       if (std::isnan(pScan->GetRangeReadings()[readingIndex]) ||
         std::isinf(pScan->GetRangeReadings()[readingIndex]))
       {

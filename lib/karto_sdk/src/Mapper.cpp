@@ -2523,7 +2523,19 @@ void Mapper::InitializeParameters()
   m_pOccupancyThreshold = new Parameter<kt_double>(
     "OccupancyThreshold",
     "Minimum ratio of beams hitting cell to beams passing through cell to be marked as occupied",
-    0.1, GetParameterManager());    
+    0.16, GetParameterManager());   
+
+  m_pScaleUpFreeCellRadius = new Parameter<kt_double>(
+    "ScaleUpFreeCellRadius",
+    "Maksimum range of attached base_link to the increased unoccupied coefficient " 
+    "for passed grids in the grid map which is those added Scan datas.",
+    1.7, GetParameterManager()); 
+
+  m_pFreeCellCoefficient = new Parameter<kt_int32u>(
+    "FreeCellCoefficient",
+    "Coefficient of the free cell in the grid map.",
+    2, GetParameterManager());
+  
 }
 /* Adding in getters and setters here for easy parameter access */
 
@@ -2690,6 +2702,16 @@ double Mapper::getParamOccupancyThreshold()
   return static_cast<double>(m_pOccupancyThreshold->GetValue());
 }
 
+double Mapper::getParamScaleUpFreeCellRadius()
+{
+  return static_cast<double>(m_pScaleUpFreeCellRadius->GetValue());
+}
+
+int Mapper::getParamFreeCellCoefficient()
+{
+  return static_cast<int>(m_pFreeCellCoefficient->GetValue());
+}
+
 /* Setters for parameters */
 // General Parameters
 void Mapper::setParamUseScanMatching(bool b)
@@ -2850,6 +2872,16 @@ void Mapper::setParamMinPassThrough(int i)
 void Mapper::setParamOccupancyThreshold(double d)
 {
   m_pOccupancyThreshold->SetValue((kt_double)d);
+}
+
+void Mapper::setParamScaleUpFreeCellRadius(double d)
+{
+  m_pScaleUpFreeCellRadius->SetValue((kt_double)d);
+}
+
+void Mapper::setParamFreeCellCoefficient(int i)
+{
+  m_pFreeCellCoefficient->SetValue((kt_int32u)i);
 }
 
 void Mapper::Initialize(kt_double rangeThreshold)
